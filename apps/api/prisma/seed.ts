@@ -2,7 +2,8 @@ import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
 
-// Creates (or updates the password of) the administrator account from env.
+// Creates the administrator account from env. Safe to run on every deploy: an
+// existing account keeps its password unless ADMIN_RESET_PASSWORD=true.
 const prisma = new PrismaClient();
 
 async function main() {
@@ -12,9 +13,10 @@ async function main() {
     throw new Error("Set ADMIN_EMAIL and ADMIN_PASSWORD (8+ characters) before seeding");
   }
   const passwordHash = await bcrypt.hash(password, 12);
+  const reset = process.env.ADMIN_RESET_PASSWORD === "true";
   const admin = await prisma.user.upsert({
     where: { email },
-    update: { passwordHash, role: "ADMIN" },
+    update: reset ? { passwordHash, role: "ADMIN" } : { role: "ADMIN" },
     create: {
       email,
       passwordHash,

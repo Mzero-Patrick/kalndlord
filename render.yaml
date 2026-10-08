@@ -1,0 +1,80 @@
+# Render Blueprint: the API server and its PostgreSQL database.
+# In Render: New > Blueprint, pick this repository, then fill in the values marked
+# "sync: false" when asked. The website deploys separately on Vercel.
+services:
+  - type: web
+    name: kalndlord-api
+    runtime: node
+    plan: starter
+    region: frankfurt
+    branch: main
+    buildCommand: corepack enable && NODE_ENV=development pnpm install --frozen-lockfile && pnpm --filter @kalndlord/api build
+    # Applies database changes and makes sure the administrator account exists.
+    preDeployCommand: cd apps/api && npx prisma migrate deploy && node dist/seed.js
+    startCommand: node apps/api/dist/server.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: kalndlord-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      # This server's public address, e.g. https://kalndlord-api.onrender.com
+      - key: PUBLIC_API_URL
+        sync: false
+      # The website's address, e.g. https://kalndlord.vercel.app
+      - key: CORS_ORIGINS
+        sync: false
+      # The website's address followed by "/", then ",kalndlord://" for the app.
+      - key: PAYMENT_REDIRECTS
+        sync: false
+      # "off" until the Flutterwave account is ready, then "flutterwave".
+      - key: PAYMENT_PROVIDER
+        value: "off"
+      - key: FLW_SECRET_KEY
+        sync: false
+      - key: FLW_WEBHOOK_HASH
+        sync: false
+      - key: SMS_PROVIDER
+        value: africastalking
+      - key: AT_USERNAME
+        sync: false
+      - key: AT_API_KEY
+        sync: false
+      - key: AT_SENDER_ID
+        sync: false
+      - key: EMAIL_PROVIDER
+        value: smtp
+      - key: SMTP_URL
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: STORAGE
+        value: s3
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: S3_PUBLIC_URL
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_NAME
+        sync: false
+
+databases:
+  - name: kalndlord-db
+    plan: basic-256mb
+    region: frankfurt
+    postgresMajorVersion: "16"

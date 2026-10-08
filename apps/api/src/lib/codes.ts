@@ -26,6 +26,7 @@ export async function issueCode(
   userId: string,
   channel: Channel,
   destination: string,
+  purpose: "verify" | "reset" = "verify",
 ) {
   const code = generateCode();
   await prisma.$transaction([
@@ -43,9 +44,13 @@ export async function issueCode(
       },
     }),
   ]);
-  const text = `Your Kalndlord verification code is ${code}. It expires in 10 minutes.`;
+  const text =
+    purpose === "reset"
+      ? `Your Kalndlord password reset code is ${code}. It expires in 10 minutes. If you didn't ask for it, ignore this message.`
+      : `Your Kalndlord verification code is ${code}. It expires in 10 minutes.`;
+  const subject = purpose === "reset" ? "Reset your Kalndlord password" : "Your Kalndlord verification code";
   if (channel === "PHONE") await notifier.sendSms(destination, text);
-  else await notifier.sendEmail(destination, "Your Kalndlord verification code", text);
+  else await notifier.sendEmail(destination, subject, text);
 }
 
 export type CheckResult = "ok" | "invalid" | "expired" | "too_many_attempts" | "none";

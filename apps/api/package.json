@@ -15,6 +15,7 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1147.0",
     "@kalndlord/shared": "workspace:*",
     "@prisma/client": "6.19.3",
     "bcryptjs": "^3.0.2",
@@ -24,14 +25,15 @@
     "express-rate-limit": "^8.1.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.2",
     "nodemailer": "^7.0.6",
-    "zod": "^4.1.0",
-    "multer": "^2.0.2"
+    "zod": "^4.1.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.0.0",
     "@types/node": "^22.18.0",
     "@types/nodemailer": "^7.0.1",
     "@types/supertest": "^6.0.3",
@@ -40,7 +42,6 @@
     "tsup": "^8.5.0",
     "tsx": "^4.20.0",
     "typescript": "5.9.3",
-    "vitest": "^3.2.0",
-    "@types/multer": "^2.0.0"
+    "vitest": "^3.2.0"
   }
 }

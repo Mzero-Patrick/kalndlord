@@ -43,7 +43,10 @@ export async function ensureCharges(prisma: PrismaClient, now = new Date(), leas
 
 // Sends at most one reminder per stage for each unpaid bill: three days before,
 // on the due date, and three days late (the landlord is told then too).
-export async function sendReminders(prisma: PrismaClient, notifier: Notifier, now = new Date()) {
+export async function sendReminders(prisma: PrismaClient, notifier: Notifier, now = new Date(), onlinePayments = true) {
+  const how = onlinePayments
+    ? "Pay from your Kalndlord account with MoMo, Airtel Money or card."
+    : "Please pay your landlord, who will record it in Kalndlord.";
   const today = startOfDay(now);
   const charges = await prisma.rentCharge.findMany({
     where: { status: "DUE", reminderStage: { lt: 3 }, dueDate: { lte: new Date(today.getTime() + REMIND_BEFORE_DAYS * DAY) } },
@@ -58,8 +61,8 @@ export async function sendReminders(prisma: PrismaClient, notifier: Notifier, no
     const what = `${formatPeriod(c.period)} rent of ${formatRwf(c.amount)} for "${c.lease.property.title}"`;
     const due = c.dueDate.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
     const text =
-      stage === 1 ? `Reminder: your ${what} is due on ${due}. Pay from your Kalndlord account with MoMo, Airtel Money or card.`
-      : stage === 2 ? `Your ${what} is due today. Pay from your Kalndlord account with MoMo, Airtel Money or card.`
+      stage === 1 ? `Reminder: your ${what} is due on ${due}. ${how}`
+      : stage === 2 ? `Your ${what} is due today. ${how}`
       : `Your ${what} was due on ${due} and is still unpaid. Please pay as soon as possible.`;
 
     // Claim the stage first so two job runs can't both send it.
@@ -78,9 +81,9 @@ export async function sendReminders(prisma: PrismaClient, notifier: Notifier, no
   return sent;
 }
 
-export async function runRentJob(prisma: PrismaClient, notifier: Notifier, now = new Date()) {
+export async function runRentJob(prisma: PrismaClient, notifier: Notifier, now = new Date(), onlinePayments = true) {
   const created = await ensureCharges(prisma, now);
-  const reminders = await sendReminders(prisma, notifier, now);
+  const reminders = await sendReminders(prisma, notifier, now, onlinePayments);
   return { created, reminders };
 }
 

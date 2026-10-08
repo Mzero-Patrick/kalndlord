@@ -27,7 +27,43 @@ report maintenance or other issues.
    use the same place to raise other business issues with their landlord. The landlord
    (or administrator) marks each report "being fixed" and "done"; both sides get an SMS
    or email on every update, and the tenant can reopen a report that isn't fixed.
-   **Next: beta launch.**
+5. **Beta launch** (ready to deploy): forgotten-password reset by SMS or email code,
+   photos in cloud storage, one-file server and database setup on Render, and Android
+   test builds of the app. See [Launch checklist](#launch-checklist).
+
+## Launch checklist
+
+Each item is an account in your name. Keys and passwords go into the hosting dashboards
+(Render, Vercel), never into the code or a chat.
+
+1. **SMS (Africa's Talking).** Create an account, top up airtime credit, and request a
+   sender ID (e.g. "Kalndlord"). You need the username, API key and sender ID.
+2. **Email.** Any SMTP provider (e.g. Brevo, Mailgun, or a Google Workspace mailbox).
+   You need an `SMTP_URL` like `smtps://user:password@smtp.example.com:465` and a from
+   address.
+3. **Photo storage (Cloudflare R2, or AWS S3).** Create a bucket, turn on public access
+   (R2: a custom domain or the r2.dev address), and create an access key with write
+   access to that bucket. You need the bucket name, endpoint, key ID, secret and public
+   address.
+4. **Server and database (Render).** In Render, choose New → Blueprint and pick this
+   repository. `render.yaml` creates the API and a PostgreSQL database in Frankfurt.
+   Fill in the values it asks for: the items above, `ADMIN_EMAIL` and `ADMIN_PASSWORD`
+   for your administrator account, and the addresses below. Each deploy applies
+   database changes and creates the administrator account if it is missing.
+   - `PUBLIC_API_URL`: the API address Render gives you, e.g. `https://kalndlord-api.onrender.com`
+   - `CORS_ORIGINS`: the website address, e.g. `https://kalndlord.vercel.app`
+   - `PAYMENT_REDIRECTS`: `https://kalndlord.vercel.app/,kalndlord://`
+5. **Website (Vercel).** The project is already connected. In its settings, set
+   `API_URL` to the API address and `WEB_URL` to the website address, then redeploy.
+6. **Payments (Flutterwave).** The server starts with online payment off. When your
+   Flutterwave account is verified, follow "Taking real payments" above and change
+   `PAYMENT_PROVIDER` to `flutterwave` in Render.
+7. **Android test app.** Install the Expo tools (`npm i -g eas-cli`), sign in with an Expo
+   account, check the API address in `apps/mobile/eas.json`, then run
+   `cd apps/mobile && eas build --profile preview --platform android`. It produces an APK
+   link to share with beta testers. For the Play Store use `--profile production`.
+8. **Try it end to end** with a few real landlords and tenants: sign up, list, apply,
+   accept, record a payment, report a problem, and reset a password.
 
 ## Run it locally
 
@@ -73,7 +109,8 @@ to repeat.
 
 **Test mode.** With `PAYMENT_PROVIDER="sandbox"` (the default), a local test page stands in
 for the payment provider and no money moves. The API refuses to start in production in
-this mode.
+this mode. Until Flutterwave is ready, use `PAYMENT_PROVIDER="off"`: tenants are told to
+pay their landlord, and landlords record cash as before.
 
 **Taking real payments (Flutterwave).**
 1. Create a Flutterwave business account for Rwanda and complete their verification.

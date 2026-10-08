@@ -141,6 +141,8 @@ export function paymentsRouter(
 
   // The tenant starts paying a bill; they are sent to the provider's page.
   router.post("/charges/:id/pay", auth(["TENANT"]), async (req, res) => {
+    if (gateway.name === "off")
+      return sendError(res, 503, "Online payment isn't switched on yet. Pay your landlord directly and they will record it");
     const parsed = payChargeSchema.safeParse(req.body);
     if (!parsed.success) return sendError(res, 400, "Missing return address", zodFields(parsed.error));
     const { redirectUrl } = parsed.data;

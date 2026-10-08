@@ -18,7 +18,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Kalndlord uses your photos so you can add pictures of the places you list."
+          "photosPermission": "Kalndlord uses your photos so you can add pictures of places you list and of problems you report."
         }
       ]
     ],

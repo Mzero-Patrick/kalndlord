@@ -35,6 +35,7 @@ export default function Login() {
       <Field label="Phone or email" value={identifier} onChangeText={setIdentifier} autoCapitalize="none" autoComplete="username" />
       <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry autoComplete="current-password" />
       <Button title="Log in" onPress={submit} busy={busy} />
+      <Button title="Forgot your password?" secondary onPress={() => router.push({ pathname: "/forgot", params: { id: identifier } })} />
       <Button title="Create an account" secondary onPress={() => router.replace("/signup")} />
     </Screen>
   );

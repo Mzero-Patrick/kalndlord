@@ -1,9 +1,10 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 
-// Photo storage. Files sit on local disk for now and are served from /uploads;
-// swapping in cloud storage later only changes this file.
+// Photo storage: local disk (served from /uploads) for development, or an
+// S3-compatible bucket such as Cloudflare R2 or AWS S3 in production.
 export interface Storage {
   save(data: Buffer, ext: string): Promise<string>;
   remove(key: string): Promise<void>;
@@ -22,6 +23,45 @@ export function localStorage(dir: string, publicUrl: string): Storage {
       await fs.rm(path.join(dir, path.basename(key)), { force: true });
     },
     url: (key) => `${publicUrl}/uploads/${key}`,
+  };
+}
+
+const CONTENT_TYPE: Record<string, string> = { jpg: "image/jpeg", png: "image/png", webp: "image/webp" };
+
+export interface S3Settings {
+  bucket: string;
+  region: string;
+  endpoint?: string; // e.g. https://<account>.r2.cloudflarestorage.com for R2
+  accessKeyId: string;
+  secretAccessKey: string;
+  publicUrl: string; // where the bucket's files can be read, e.g. https://photos.example.rw
+}
+
+export function s3Storage(settings: S3Settings): Storage {
+  const client = new S3Client({
+    region: settings.region,
+    endpoint: settings.endpoint,
+    credentials: { accessKeyId: settings.accessKeyId, secretAccessKey: settings.secretAccessKey },
+  });
+  const base = settings.publicUrl.replace(/\/$/, "");
+  return {
+    async save(data, ext) {
+      const key = `${crypto.randomUUID()}.${ext}`;
+      await client.send(
+        new PutObjectCommand({
+          Bucket: settings.bucket,
+          Key: key,
+          Body: data,
+          ContentType: CONTENT_TYPE[ext] ?? "application/octet-stream",
+          CacheControl: "public, max-age=604800, immutable",
+        }),
+      );
+      return key;
+    },
+    async remove(key) {
+      await client.send(new DeleteObjectCommand({ Bucket: settings.bucket, Key: path.basename(key) }));
+    },
+    url: (key) => `${base}/${key}`,
   };
 }
 

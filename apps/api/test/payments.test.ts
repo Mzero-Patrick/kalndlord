@@ -1,6 +1,6 @@
 import request from "supertest";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import type { PaymentGateway, VerifyResult } from "../src/lib/gateway";
+import { paymentsOff, type PaymentGateway, type VerifyResult } from "../src/lib/gateway";
 import { makeUser, rentedPlace, resetDb, setup } from "./helpers";
 
 // A provider whose answers each test controls.
@@ -15,6 +15,7 @@ const fake: PaymentGateway = {
 
 const { prisma, notifier, app } = setup(fake);
 const sandboxed = setup();
+const off = setup(paymentsOff);
 
 beforeEach(async () => {
   await resetDb(prisma);
@@ -24,6 +25,7 @@ beforeEach(async () => {
 afterAll(async () => {
   await prisma.$disconnect();
   await sandboxed.prisma.$disconnect();
+  await off.prisma.$disconnect();
 });
 
 const RETURN = "http://localhost:3000/payments/result";
@@ -33,6 +35,19 @@ function startPayment(auth: Record<string, string>, chargeId: string) {
 }
 
 describe("paying rent", () => {
+  it("refuses online payment while it is switched off, and cash can still be recorded", async () => {
+    const { tenant, landlord, leaseId } = await rentedPlace(off.app, off.prisma);
+    const charge = await off.prisma.rentCharge.findFirstOrThrow({ where: { leaseId } });
+    const res = await request(off.app)
+      .post(`/charges/${charge.id}/pay`)
+      .set(tenant.auth)
+      .send({ redirectUrl: "http://localhost:3000/payments/result" })
+      .expect(503);
+    expect(res.body.error).toMatch(/isn't switched on/);
+    expect(await off.prisma.payment.count()).toBe(0);
+    await request(off.app).post(`/charges/${charge.id}/cash`).set(landlord.auth).send({}).expect(201);
+  });
+
   it("records a MoMo payment against the tenant's account and issues a receipt", async () => {
     const { tenant, landlord, leaseId } = await rentedPlace(app, prisma, 200000);
     const bills = await request(app).get("/charges").set(tenant.auth).expect(200);

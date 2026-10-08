@@ -109,3 +109,13 @@ export function sandbox(publicUrl: string): PaymentGateway & { complete(txRef: s
 }
 
 export type SandboxOutcome = "MTN" | "AIRTEL" | "CARD" | "FAIL";
+
+// Online payment switched off: the pay endpoint refuses before calling this.
+export const paymentsOff: PaymentGateway = {
+  name: "off",
+  createCheckout: async () => {
+    throw new Error("Online payment is off");
+  },
+  verify: async () => ({ status: "pending" }),
+  webhookTxRef: () => null,
+};
