@@ -13,6 +13,7 @@ import { applicationsRouter } from "./routes/applications";
 import { inquiriesRouter } from "./routes/inquiries";
 import { paymentsRouter } from "./routes/payments";
 import { noticesRouter } from "./routes/notices";
+import { issuesRouter } from "./routes/issues";
 import { localStorage, type Storage } from "./lib/storage";
 import { flutterwave, sandbox, type PaymentGateway } from "./lib/gateway";
 import { sendError } from "./lib/http";
@@ -50,6 +51,7 @@ export function createApp({ prisma, notifier, config, storage, gateway, rateLimi
   app.use("/listings", listingsRouter(prisma, notifier, photos, config));
   app.use("/inquiries", inquiriesRouter(prisma, notifier, config));
   app.use("/notices", noticesRouter(prisma, notifier, config));
+  app.use("/issues", issuesRouter(prisma, notifier, photos, config));
   app.use("/", applicationsRouter(prisma, notifier, config));
   app.use("/", paymentsRouter(prisma, notifier, gateway ?? createGateway(config), config));
   app.use("/uploads", express.static(config.uploadDir, { maxAge: "7d", index: false }));
@@ -57,7 +59,7 @@ export function createApp({ prisma, notifier, config, storage, gateway, rateLimi
   app.use((_req, res) => sendError(res, 404, "Not found"));
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     if (err instanceof multer.MulterError) {
-      const message = err.code === "LIMIT_FILE_SIZE" ? "Each photo must be under 5 MB" : "Too many photos at once";
+      const message = err.code === "LIMIT_FILE_SIZE" ? "Each photo must be under 5 MB" : "Too many photos at once (up to 4 on a report, 8 on a listing)";
       return sendError(res, 400, message);
     }
     console.error(err);

@@ -5,9 +5,11 @@ import { Redirect, router, useFocusEffect } from "expo-router";
 import {
   formatPeriod,
   formatRwf,
+  ISSUE_STATUS_LABEL,
   PAYMENT_METHOD_LABEL,
   type Application,
   type Inquiry,
+  type Issue,
   type Lease,
   type Listing,
   type Notice,
@@ -28,6 +30,7 @@ interface Data {
   listings: (Listing & { pendingApplications: number })[];
   charges: RentCharge[];
   notices: Notice[];
+  issues: Issue[];
 }
 
 const items = async <T,>(path: string) => {
@@ -42,11 +45,13 @@ export default function Home() {
   const [data, setData] = useState<Data>();
   const [error, setError] = useState<string>();
   const [refreshing, setRefreshing] = useState(false);
+  const [paying, setPaying] = useState<string>();
+  const [notice, setNotice] = useState<string>();
 
   const load = useCallback(async () => {
     if (!user) return;
     const manager = user.role !== "TENANT";
-    const [summary, applications, leases, questions, listings, charges, notices] = await Promise.all([
+    const [summary, applications, leases, questions, listings, charges, notices, issues] = await Promise.all([
       api<Summary>(`/dashboard/${user.role.toLowerCase()}`),
       items<Application>("/applications"),
       items<Lease>("/leases"),
@@ -54,10 +59,11 @@ export default function Home() {
       manager ? items<Listing & { pendingApplications: number }>("/listings/mine") : Promise.resolve([]),
       items<RentCharge>("/charges"),
       items<Notice>("/notices"),
+      items<Issue>("/issues"),
     ]);
     if (!summary.ok) return setError(summary.data.error);
     setError(undefined);
-    setData({ summary: summary.data, applications, leases, questions, listings, charges, notices });
+    setData({ summary: summary.data, applications, leases, questions, listings, charges, notices, issues });
   }, [user]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -70,9 +76,6 @@ export default function Home() {
     if (!res.ok) setError(res.data.error);
     load();
   }
-
-  const [paying, setPaying] = useState<string>();
-  const [notice, setNotice] = useState<string>();
 
   async function pay(chargeId: string) {
     setPaying(chargeId);
@@ -125,6 +128,21 @@ export default function Home() {
               </View>
             )}
 
+
+            <Section title={`Repairs and other issues (${Number(s?.openRequests ?? 0)} open)`}>
+              {data.issues.length === 0 && <Muted>{tenant ? "Nothing reported. Tell your landlord about repairs or any other issue." : "No reports from tenants yet."}</Muted>}
+              {[...data.issues].sort((a, b) => Number(a.status === "DONE") - Number(b.status === "DONE")).slice(0, 10).map((i) => (
+                <View key={i.id} style={{ gap: 2 }}>
+                  <Text style={{ color: c.brand, fontWeight: "600" }} onPress={() => router.push(`/issues/${i.id}`)}>{i.subject}</Text>
+                  <Body muted>
+                    {i.urgent && i.status !== "DONE" ? "Urgent · " : ""}{ISSUE_STATUS_LABEL[i.status]} · {i.property.title}{tenant ? "" : ` · ${i.tenant.fullName}`}
+                  </Body>
+                </View>
+              ))}
+              {tenant && data.leases.some((l) => l.status === "ACTIVE") && (
+                <Button title="Report a problem" onPress={() => router.push("/issues/new")} />
+              )}
+            </Section>
 
             <Section title="Rent">
               {data.charges.length === 0 && <Muted>No rent bills yet.</Muted>}

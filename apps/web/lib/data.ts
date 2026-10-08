@@ -1,5 +1,5 @@
 import "server-only";
-import type { Application, Inquiry, Lease, Listing, Notice, Payment, RentCharge } from "@kalndlord/shared";
+import type { Application, Inquiry, Issue, Lease, Listing, Notice, Payment, RentCharge } from "@kalndlord/shared";
 import { api } from "./api";
 
 async function items<T>(path: string): Promise<T[]> {
@@ -14,3 +14,4 @@ export const questions = () => items<Inquiry & { canReply: boolean }>("/inquirie
 export const charges = () => items<RentCharge>("/charges");
 export const payments = () => items<Payment>("/payments");
 export const notices = () => items<Notice>("/notices");
+export const issues = () => items<Issue>("/issues");

@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { formatRwf, type PublicUser } from "@kalndlord/shared";
 import { loadDashboard } from "@/lib/session";
-import { applications, charges, myListings, notices, payments, questions } from "@/lib/data";
+import { applications, charges, issues, myListings, notices, payments, questions } from "@/lib/data";
 import { NoticesList, PaymentsTable, RentPanel } from "@/components/RentPanels";
 import { NoticeForm } from "@/components/RentForms";
+import { IssuesPanel } from "@/components/IssuesPanel";
 import { ApplicationsPanel, ListingsTable, QuestionsPanel } from "@/components/Panels";
 
 interface AdminData {
@@ -16,12 +17,13 @@ interface AdminData {
   collectedThisMonth: number;
   owed: number;
   unpaidBills: number;
+  openRequests: number;
 }
 
 export default async function AdminDashboard() {
   const data = await loadDashboard<AdminData>("ADMIN");
-  const [listings, apps, qs, bills, paid, sent] = await Promise.all([
-    myListings(), applications(), questions(), charges(), payments(), notices(),
+  const [listings, apps, qs, bills, paid, sent, reports] = await Promise.all([
+    myListings(), applications(), questions(), charges(), payments(), notices(), issues(),
   ]);
   const unpaid = bills.filter((b) => b.status === "DUE");
   const tenants = data.recentUsers.filter((u) => u.role === "TENANT");
@@ -38,9 +40,11 @@ export default async function AdminDashboard() {
         <div className="card"><div className="muted">Active rentals</div><div className="stat">{data.activeLeases}</div></div>
         <div className="card"><div className="muted">Applications waiting</div><div className="stat">{data.pendingApplications}</div></div>
         <div className="card"><div className="muted">Unanswered questions</div><div className="stat">{data.unansweredQuestions}</div></div>
+        <div className="card"><div className="muted">Open reports</div><div className="stat">{data.openRequests}</div><div className="hint">Repairs and other issues</div></div>
         <div className="card"><div className="muted">Rent collected this month</div><div className="stat">{formatRwf(data.collectedThisMonth)}</div></div>
         <div className="card"><div className="muted">Rent owed</div><div className="stat">{formatRwf(data.owed)}</div><div className="hint">{data.unpaidBills} unpaid bill{data.unpaidBills === 1 ? "" : "s"}</div></div>
       </div>
+      <section className="card"><h2>Repairs and other issues</h2><IssuesPanel items={reports} viewer="ADMIN" empty="No reports from tenants yet." /></section>
       <section className="card"><h2>Unpaid rent</h2><RentPanel items={unpaid} viewer="ADMIN" /></section>
       <section className="card"><h2>Recent payments</h2><PaymentsTable items={paid.slice(0, 20)} /></section>
       <section className="card"><h2>Questions</h2><QuestionsPanel items={qs} empty="No questions yet." /></section>

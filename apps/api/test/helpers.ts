@@ -47,6 +47,7 @@ export function setup(gateway?: PaymentGateway) {
 }
 
 export async function resetDb(prisma: PrismaClient) {
+  await prisma.issue.deleteMany();
   await prisma.notice.deleteMany();
   await prisma.payment.deleteMany();
   await prisma.rentCharge.deleteMany();

@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { formatRwf, type PublicUser } from "@kalndlord/shared";
 import { loadDashboard } from "@/lib/session";
-import { applications, charges, leases, notices, questions } from "@/lib/data";
+import { applications, charges, issues, leases, notices, questions } from "@/lib/data";
 import { LeasesPanel, MyApplications, QuestionsPanel } from "@/components/Panels";
 import { NoticesList, RentPanel } from "@/components/RentPanels";
 import { PayButton } from "@/components/RentForms";
+import { IssuesPanel } from "@/components/IssuesPanel";
+import { ReportIssueForm } from "@/components/IssueForms";
 
 interface TenantData {
   user: PublicUser;
@@ -16,9 +18,10 @@ interface TenantData {
 
 export default async function TenantDashboard() {
   const data = await loadDashboard<TenantData>("TENANT");
-  const [apps, myLeases, qs, bills, myNotices] = await Promise.all([
-    applications(), leases(), questions(), charges(), notices(),
+  const [apps, myLeases, qs, bills, myNotices, reports] = await Promise.all([
+    applications(), leases(), questions(), charges(), notices(), issues(),
   ]);
+  const places = myLeases.filter((l) => l.status === "ACTIVE").map((l) => ({ leaseId: l.id, title: l.property.title }));
   const next = data.nextPayment;
   return (
     <main className="container stack">
@@ -35,9 +38,19 @@ export default async function TenantDashboard() {
           {next && <div className="hint">Due {new Date(next.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "long" })}</div>}
           {next && <PayButton chargeId={next.chargeId} label="Pay with MoMo, Airtel or card" />}
         </div>
+        <div className="card"><div className="muted">Open reports</div><div className="stat">{data.openRequests}</div></div>
       </div>
       {myNotices.length > 0 && <section className="card"><h2>Notices</h2><NoticesList items={myNotices.slice(0, 5)} /></section>}
       <section className="card"><h2>Rent</h2><RentPanel items={bills} viewer="TENANT" /></section>
+      <section className="card stack" id="report">
+        <h2 style={{ margin: 0 }}>Repairs and other issues</h2>
+        {places.length ? (
+          <ReportIssueForm places={places} />
+        ) : (
+          <p className="muted">Once you rent a place, you can report repairs and other issues to your landlord here.</p>
+        )}
+        {reports.length > 0 && <><h3 style={{ marginBottom: 0 }}>My reports</h3><IssuesPanel items={reports} viewer="TENANT" empty="" /></>}
+      </section>
       <section className="card"><h2>My rentals</h2><LeasesPanel items={myLeases} viewer="TENANT" /></section>
       <section className="card"><h2>My applications</h2><MyApplications items={apps} /></section>
       <section className="card">
