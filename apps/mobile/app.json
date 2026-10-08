@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "Kalndlord",
+    "slug": "kalndlord",
+    "scheme": "kalndlord",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "ios": { "bundleIdentifier": "rw.kalndlord.app" },
+    "android": { "package": "rw.kalndlord.app" },
+    "plugins": ["expo-router", "expo-secure-store"],
+    "experiments": { "typedRoutes": false }
+  }
+}
