@@ -31,6 +31,11 @@ model User {
   updatedAt       DateTime  @updatedAt
 
   verificationCodes VerificationCode[]
+  properties        Property[]         @relation("PropertyLandlord")
+  applications      Application[]
+  tenantLeases      Lease[]            @relation("LeaseTenant")
+  landlordLeases    Lease[]            @relation("LeaseLandlord")
+  inquiries         Inquiry[]
 }
 
 model VerificationCode {
@@ -46,4 +51,127 @@ model VerificationCode {
   createdAt   DateTime  @default(now())
 
   @@index([userId, createdAt])
+}
+
+enum PropertyType {
+  HOUSE
+  APARTMENT
+  ROOM
+  WORKSHOP
+  OFFICE
+  SHOP
+}
+
+enum PropertyStatus {
+  AVAILABLE
+  OCCUPIED
+  HIDDEN
+}
+
+model Property {
+  id          String         @id @default(cuid())
+  landlordId  String
+  landlord    User           @relation("PropertyLandlord", fields: [landlordId], references: [id])
+  title       String
+  type        PropertyType
+  description String
+  district    String
+  sector      String
+  address     String?
+  monthlyRent Int
+  deposit     Int?
+  sizeSqm     Int?
+  bedrooms    Int?
+  terms       String
+  status      PropertyStatus @default(AVAILABLE)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  photos       Photo[]
+  applications Application[]
+  leases       Lease[]
+  inquiries    Inquiry[]
+
+  @@index([status, district, type])
+  @@index([landlordId])
+}
+
+model Photo {
+  id         String   @id @default(cuid())
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  key        String
+  position   Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([propertyId, position])
+}
+
+enum ApplicationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+model Application {
+  id              String            @id @default(cuid())
+  propertyId      String
+  property        Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  tenantId        String
+  tenant          User              @relation(fields: [tenantId], references: [id])
+  message         String?
+  moveInDate      DateTime?
+  // The exact terms text the tenant accepted, kept even if the listing changes later.
+  acceptedTerms   String
+  termsAcceptedAt DateTime
+  status          ApplicationStatus @default(PENDING)
+  decidedAt       DateTime?
+  createdAt       DateTime          @default(now())
+
+  @@index([propertyId, status])
+  @@index([tenantId])
+}
+
+enum LeaseStatus {
+  ACTIVE
+  ENDED
+}
+
+model Lease {
+  id            String      @id @default(cuid())
+  propertyId    String
+  property      Property    @relation(fields: [propertyId], references: [id])
+  tenantId      String
+  tenant        User        @relation("LeaseTenant", fields: [tenantId], references: [id])
+  landlordId    String
+  landlord      User        @relation("LeaseLandlord", fields: [landlordId], references: [id])
+  applicationId String      @unique
+  monthlyRent   Int
+  terms         String
+  startDate     DateTime
+  endDate       DateTime?
+  status        LeaseStatus @default(ACTIVE)
+  createdAt     DateTime    @default(now())
+
+  @@index([tenantId])
+  @@index([landlordId])
+}
+
+// Questions from the contact section: about a listing (goes to its landlord)
+// or general (goes to the administrator).
+model Inquiry {
+  id         String    @id @default(cuid())
+  fromId     String
+  from       User      @relation(fields: [fromId], references: [id])
+  propertyId String?
+  property   Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  subject    String
+  message    String
+  reply      String?
+  repliedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([propertyId])
+  @@index([fromId])
 }

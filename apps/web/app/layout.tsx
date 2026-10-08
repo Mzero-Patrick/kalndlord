@@ -18,6 +18,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <header className="topbar">
           <Link href="/" className="brand">Kalndlord</Link>
           <nav className="nav">
+            <Link href="/listings">Find a place</Link>
+            <Link href="/contact">Contact</Link>
             {user ? (
               <>
                 <Link href={DASHBOARD_PATH[user.role]}>Dashboard</Link>

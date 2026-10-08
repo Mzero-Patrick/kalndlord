@@ -10,6 +10,9 @@ export interface Config {
   port: number;
   jwtSecret: string;
   corsOrigins: string[];
+  // Address the API is reachable at, used to build photo links.
+  publicUrl: string;
+  uploadDir: string;
   sms: { provider: "console" | "africastalking"; username?: string; apiKey?: string; senderId?: string };
   email: { provider: "console" | "smtp"; smtpUrl?: string; from: string };
 }
@@ -23,6 +26,8 @@ export function loadConfig(): Config {
     port: Number(process.env.PORT ?? 4000),
     jwtSecret,
     corsOrigins: (process.env.CORS_ORIGINS ?? "http://localhost:3000").split(",").map((s) => s.trim()),
+    publicUrl: (process.env.PUBLIC_API_URL ?? `http://localhost:${process.env.PORT ?? 4000}`).replace(/\/$/, ""),
+    uploadDir: process.env.UPLOAD_DIR ?? "uploads",
     sms: {
       provider: process.env.SMS_PROVIDER === "africastalking" ? "africastalking" : "console",
       username: process.env.AT_USERNAME,

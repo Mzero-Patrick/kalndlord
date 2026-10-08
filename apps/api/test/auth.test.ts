@@ -1,13 +1,12 @@
 import request from "supertest";
 import bcrypt from "bcryptjs";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { setup } from "./helpers";
+import { resetDb, setup } from "./helpers";
 
 const { prisma, notifier, app } = setup();
 
 beforeEach(async () => {
-  await prisma.verificationCode.deleteMany();
-  await prisma.user.deleteMany();
+  await resetDb(prisma);
   notifier.sent = [];
 });
 afterAll(() => prisma.$disconnect());
