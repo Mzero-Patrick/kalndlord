@@ -1,0 +1,21 @@
+{
+  "name": "kalndlord",
+  "private": true,
+  "packageManager": "pnpm@10.28.0",
+  "scripts": {
+    "dev:api": "pnpm --filter @kalndlord/api dev",
+    "dev:web": "pnpm --filter @kalndlord/web dev",
+    "dev:mobile": "pnpm --filter @kalndlord/mobile start",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "esbuild"
+    ]
+  }
+}
