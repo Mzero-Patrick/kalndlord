@@ -40,6 +40,9 @@ model User {
   recordedPayments  Payment[]          @relation("PaymentRecorder")
   sentNotices       Notice[]           @relation("NoticeSender")
   receivedNotices   Notice[]           @relation("NoticeRecipient")
+  reportedIssues    Issue[]            @relation("IssueTenant")
+  assignedIssues    Issue[]            @relation("IssueLandlord")
+  issueUpdates      IssueUpdate[]
 }
 
 model VerificationCode {
@@ -95,6 +98,7 @@ model Property {
   applications Application[]
   leases       Lease[]
   inquiries    Inquiry[]
+  issues       Issue[]
 
   @@index([status, district, type])
   @@index([landlordId])
@@ -159,6 +163,7 @@ model Lease {
   createdAt     DateTime    @default(now())
 
   charges RentCharge[]
+  issues  Issue[]
 
   @@index([tenantId])
   @@index([landlordId])
@@ -259,4 +264,67 @@ model Notice {
 
   @@index([recipientId, createdAt])
   @@index([senderId, createdAt])
+}
+
+enum IssueKind {
+  MAINTENANCE
+  OTHER
+}
+
+enum IssueStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+}
+
+// A tenant's report to their landlord: a repair, or any other issue about the
+// rental or business. The landlord moves it from open to done.
+model Issue {
+  id         String      @id @default(cuid())
+  leaseId    String
+  lease      Lease       @relation(fields: [leaseId], references: [id])
+  propertyId String
+  property   Property    @relation(fields: [propertyId], references: [id])
+  tenantId   String
+  tenant     User        @relation("IssueTenant", fields: [tenantId], references: [id])
+  landlordId String
+  landlord   User        @relation("IssueLandlord", fields: [landlordId], references: [id])
+  kind       IssueKind
+  urgent     Boolean     @default(false)
+  subject    String
+  message    String
+  status     IssueStatus @default(OPEN)
+  resolvedAt DateTime?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  photos  IssuePhoto[]
+  updates IssueUpdate[]
+
+  @@index([landlordId, status])
+  @@index([tenantId, createdAt])
+}
+
+model IssuePhoto {
+  id        String   @id @default(cuid())
+  issueId   String
+  issue     Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  key       String
+  createdAt DateTime @default(now())
+
+  @@index([issueId])
+}
+
+// A message on an issue, optionally changing its status.
+model IssueUpdate {
+  id        String       @id @default(cuid())
+  issueId   String
+  issue     Issue        @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User         @relation(fields: [authorId], references: [id])
+  message   String?
+  status    IssueStatus?
+  createdAt DateTime     @default(now())
+
+  @@index([issueId, createdAt])
 }

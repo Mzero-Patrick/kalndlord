@@ -23,8 +23,11 @@ report maintenance or other issues.
 3. **Rent payments** (done): MTN MoMo, Airtel Money and card. Reminders go to the phone or
    email given at sign-up, landlords can send notices, and each payment is recorded
    against the tenant account that paid.
-4. **Maintenance and launch**: tenants report issues with a message or photo, and use
-   the same place to raise other business matters with their landlord. Then a beta.
+4. **Maintenance** (done): tenants report repairs with a message and up to 4 photos, and
+   use the same place to raise other business issues with their landlord. The landlord
+   (or administrator) marks each report "being fixed" and "done"; both sides get an SMS
+   or email on every update, and the tenant can reopen a report that isn't fixed.
+   **Next: beta launch.**
 
 ## Run it locally
 
@@ -84,9 +87,11 @@ A payment only counts once the API has confirmed it with Flutterwave for the ful
 
 ## Photos
 
-Listing photos (JPG, PNG or WebP, up to 5 MB, 8 per listing) are saved in `apps/api/uploads`
+Listing photos (JPG, PNG or WebP, up to 5 MB, 8 per listing) and report photos (4 per
+report) are saved in `apps/api/uploads`
 and served from `PUBLIC_API_URL/uploads`. Before launch this should move to cloud storage;
-only `apps/api/src/lib/storage.ts` needs to change.
+only `apps/api/src/lib/storage.ts` needs to change. Photo addresses use random names that
+can't be guessed, but anyone holding a link can open it.
 
 On the mobile app, set `EXPO_PUBLIC_API_URL` to an address your phone can reach (your
 computer's local network IP), and set the API's `PUBLIC_API_URL` to the same address so
