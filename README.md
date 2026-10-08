@@ -20,7 +20,7 @@ report maintenance or other issues.
 2. **Listings** (done): admin or landlord lists a house or workshop with a short description
    and the building's terms and conditions; tenants read them, apply, or ask for help
    through a contact section.
-3. **Rent payments**: MTN MoMo, Airtel Money and card. Reminders go to the phone or
+3. **Rent payments** (done): MTN MoMo, Airtel Money and card. Reminders go to the phone or
    email given at sign-up, landlords can send notices, and each payment is recorded
    against the tenant account that paid.
 4. **Maintenance and launch**: tenants report issues with a message or photo, and use
@@ -51,6 +51,36 @@ any SMS or email account.
 
 To send real messages, set `SMS_PROVIDER="africastalking"` with your Africa's Talking
 credentials, and `EMAIL_PROVIDER="smtp"` with an `SMTP_URL`.
+
+## Rent and payments
+
+- When a landlord accepts an application, the first month's rent bill is created at once.
+  After that the API creates each month's bill a week before it is due (same day of the
+  month as the move-in date, capped at the 28th).
+- Tenants pay from their dashboard. They are sent to the payment page, choose MTN MoMo,
+  Airtel Money or card, and come back to a confirmation and a receipt. The payment is
+  recorded against the tenant account that paid, and both tenant and landlord get a message.
+- Reminders go to the phone or email given at sign-up: 3 days before the due date, on the
+  due date, and 3 days late (the landlord is told then too).
+- Landlords can record cash payments and send notices to their tenants. The administrator
+  can send notices to every tenant.
+
+The rent job runs inside the API every `RENT_JOB_MINUTES` (default 60). Every step is safe
+to repeat.
+
+**Test mode.** With `PAYMENT_PROVIDER="sandbox"` (the default), a local test page stands in
+for the payment provider and no money moves. The API refuses to start in production in
+this mode.
+
+**Taking real payments (Flutterwave).**
+1. Create a Flutterwave business account for Rwanda and complete their verification.
+2. Set `PAYMENT_PROVIDER="flutterwave"` and `FLW_SECRET_KEY` (from Settings → API keys).
+3. In Flutterwave's webhook settings, set the URL to `PUBLIC_API_URL/payments/webhook`
+   and choose a secret hash. Put the same value in `FLW_WEBHOOK_HASH`.
+4. Set `PAYMENT_REDIRECTS` to your website address and `kalndlord://` for the app, and
+   `WEB_URL` in the web app to the website address.
+
+A payment only counts once the API has confirmed it with Flutterwave for the full amount in RWF.
 
 ## Photos
 

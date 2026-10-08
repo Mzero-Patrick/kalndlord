@@ -7,6 +7,7 @@ import { notifyUser } from "../lib/notify-user";
 import { contactSelect, toApplication, toLease } from "../lib/serialize";
 import { requireAuth } from "../middleware/auth";
 import { canManage } from "./listings";
+import { ensureCharges } from "../lib/billing";
 
 const appInclude = {
   property: { select: { id: true, title: true, monthlyRent: true, landlordId: true, terms: true, status: true } },
@@ -83,6 +84,8 @@ export function applicationsRouter(prisma: PrismaClient, notifier: Notifier, con
         throw err;
       });
     if (!lease) return sendError(res, 409, "This application or place was already answered");
+    // The first month's bill exists right away so the tenant can pay it.
+    await ensureCharges(prisma, now, lease.id);
 
     await notifyUser(notifier, app.tenant, "Application accepted",
       `Your application for "${app.property.title}" was accepted. Open Kalndlord to see your rental.`);
