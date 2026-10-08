@@ -10,17 +10,24 @@ export interface ApiResult<T> {
   data: T & { error?: string; fields?: Record<string, string> };
 }
 
-export async function api<T>(path: string, init: { method?: string; body?: unknown; token?: string } = {}) {
+// Calls the API from the web server. The signed-in user's token is sent
+// automatically unless one is passed explicitly.
+export async function api<T>(
+  path: string,
+  init: { method?: string; body?: unknown; token?: string | null } = {},
+): Promise<ApiResult<T>> {
+  const token = init.token === undefined ? await getToken() : init.token;
+  const isForm = init.body instanceof FormData;
   const res = await fetch(`${API_URL}${path}`, {
     method: init.method ?? (init.body ? "POST" : "GET"),
     headers: {
-      "Content-Type": "application/json",
-      ...(init.token ? { Authorization: `Bearer ${init.token}` } : {}),
+      ...(isForm ? {} : { "Content-Type": "application/json" }),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: init.body ? JSON.stringify(init.body) : undefined,
+    body: isForm ? (init.body as FormData) : init.body ? JSON.stringify(init.body) : undefined,
     cache: "no-store",
   });
-  const data = await res.json().catch(() => ({ error: "Unexpected response from the server" }));
+  const data = res.status === 204 ? {} : await res.json().catch(() => ({ error: "Unexpected response from the server" }));
   return { ok: res.ok, status: res.status, data } as ApiResult<T>;
 }
 

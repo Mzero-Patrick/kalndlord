@@ -25,7 +25,8 @@
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "nodemailer": "^7.0.6",
-    "zod": "^4.1.0"
+    "zod": "^4.1.0",
+    "multer": "^2.0.2"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
@@ -39,6 +40,7 @@
     "tsup": "^8.5.0",
     "tsx": "^4.20.0",
     "typescript": "5.9.3",
-    "vitest": "^3.2.0"
+    "vitest": "^3.2.0",
+    "@types/multer": "^2.0.0"
   }
 }

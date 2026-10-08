@@ -10,8 +10,8 @@ export default function Home() {
           or card, and report maintenance issues, all in one place.
         </p>
         <p style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          <Link href="/signup" className="button">Create an account</Link>
-          <Link href="/login" className="button secondary">Log in</Link>
+          <Link href="/listings" className="button">Find a place</Link>
+          <Link href="/signup" className="button secondary">Create an account</Link>
         </p>
       </section>
       <section className="grid">

@@ -75,3 +75,41 @@ const styles = StyleSheet.create({
   banner: { borderWidth: 1, borderRadius: 8, padding: 10 },
   card: { borderWidth: 1, borderRadius: 10, padding: 16, gap: 2 },
 });
+
+export function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  const c = usePalette();
+  return (
+    <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border, gap: 10 }]}>
+      <Text style={{ color: c.text, fontSize: 18, fontWeight: "700" }}>{title}</Text>
+      {children}
+    </View>
+  );
+}
+
+export function Body({ children, muted, bold }: { children: React.ReactNode; muted?: boolean; bold?: boolean }) {
+  const c = usePalette();
+  return <Text style={{ color: muted ? c.muted : c.text, fontWeight: bold ? "600" : "400" }}>{children}</Text>;
+}
+
+export function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  const c = usePalette();
+  return (
+    <Pressable
+      onPress={onPress}
+      style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: active ? c.brand : c.border }}
+    >
+      <Text style={{ color: active ? c.brand : c.text }}>{label}</Text>
+    </Pressable>
+  );
+}
+
+const STATUS_TONE: Record<string, "ok" | "warn" | "danger" | "muted"> = {
+  AVAILABLE: "ok", ACCEPTED: "ok", ACTIVE: "ok", PENDING: "warn", OCCUPIED: "warn", REJECTED: "danger",
+};
+
+export function StatusText({ status }: { status: string }) {
+  const c = usePalette();
+  const tone = STATUS_TONE[status] ?? "muted";
+  const color = tone === "ok" ? c.ok : tone === "danger" ? c.danger : tone === "warn" ? "#b54708" : c.muted;
+  return <Text style={{ color, fontWeight: "600" }}>{status.charAt(0) + status.slice(1).toLowerCase()}</Text>;
+}

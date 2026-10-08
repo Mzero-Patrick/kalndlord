@@ -12,7 +12,8 @@ export default function Welcome() {
     <Screen>
       <Title>Kalndlord</Title>
       <Muted>Find homes and workshops, pay rent with MTN MoMo, Airtel Money or card, and report maintenance issues.</Muted>
-      <Button title="Create an account" onPress={() => router.push("/signup")} />
+      <Button title="Find a place" onPress={() => router.push("/listings")} />
+      <Button title="Create an account" secondary onPress={() => router.push("/signup")} />
       <Button title="Log in" secondary onPress={() => router.push("/login")} />
     </Screen>
   );

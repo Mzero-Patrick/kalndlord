@@ -17,7 +17,7 @@ report maintenance or other issues.
 
 1. **Foundations** (done): sign-up by phone or email with a verification code, login,
    and separate dashboards for administrator, landlords and tenants.
-2. **Listings**: admin or landlord lists a house or workshop with a short description
+2. **Listings** (done): admin or landlord lists a house or workshop with a short description
    and the building's terms and conditions; tenants read them, apply, or ask for help
    through a contact section.
 3. **Rent payments**: MTN MoMo, Airtel Money and card. Reminders go to the phone or
@@ -51,6 +51,16 @@ any SMS or email account.
 
 To send real messages, set `SMS_PROVIDER="africastalking"` with your Africa's Talking
 credentials, and `EMAIL_PROVIDER="smtp"` with an `SMTP_URL`.
+
+## Photos
+
+Listing photos (JPG, PNG or WebP, up to 5 MB, 8 per listing) are saved in `apps/api/uploads`
+and served from `PUBLIC_API_URL/uploads`. Before launch this should move to cloud storage;
+only `apps/api/src/lib/storage.ts` needs to change.
+
+On the mobile app, set `EXPO_PUBLIC_API_URL` to an address your phone can reach (your
+computer's local network IP), and set the API's `PUBLIC_API_URL` to the same address so
+photos load on the phone.
 
 ## Tests
 

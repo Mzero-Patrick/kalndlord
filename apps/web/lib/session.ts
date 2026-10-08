@@ -6,7 +6,7 @@ import { api, getToken } from "./api";
 export async function currentUser(): Promise<PublicUser | null> {
   const token = await getToken();
   if (!token) return null;
-  const res = await api<{ user: PublicUser }>("/auth/me", { token });
+  const res = await api<{ user: PublicUser }>("/auth/me");
   return res.ok ? res.data.user : null;
 }
 
@@ -15,7 +15,7 @@ export async function currentUser(): Promise<PublicUser | null> {
 export async function loadDashboard<T>(role: Role): Promise<T> {
   const token = await getToken();
   if (!token) redirect("/login");
-  const res = await api<T>(`/dashboard/${role.toLowerCase()}`, { token });
+  const res = await api<T>(`/dashboard/${role.toLowerCase()}`);
   if (res.status === 401) redirect("/login");
   if (res.status === 403) {
     const user = await currentUser();
