@@ -28,52 +28,53 @@ report maintenance or other issues.
    (or administrator) marks each report "being fixed" and "done"; both sides get an SMS
    or email on every update, and the tenant can reopen a report that isn't fixed.
 5. **Beta launch** (ready to deploy): forgotten-password reset by SMS or email code,
-   hosting setup (website on Vercel; server, database and photos on Railway), and
-   Android test builds of the app. See [Launch checklist](#launch-checklist).
+   photos in cloud storage, free hosting of the website, server and database on Vercel,
+   and Android test builds of the app. See [Launch checklist](#launch-checklist).
 
 ## Launch checklist
 
-The website runs on Vercel (already connected). The server, its PostgreSQL database and
-uploaded photos run on Railway. Keys and passwords go into the Railway and Vercel
-dashboards, never into the code or a chat.
+Everything runs on Vercel's free (Hobby) plan: the website, the server, a PostgreSQL
+database (Neon, added from Vercel's Storage tab) and photo storage (Vercel Blob). Keys
+and passwords go into the Vercel dashboard, never into the code or a chat.
 
-> Railway gives new accounts trial credit; after that the Hobby plan is about $5 a month,
-> which covers a beta of this size.
+> Vercel's free plan is meant for personal, non-commercial use. It is fine for a beta;
+> once Kalndlord charges or earns money, move the team to Vercel Pro. Nothing in the code
+> changes. Neon's and Blob's free allowances are small, so watch their usage pages.
 
-1. **SMS (Africa's Talking).** Create an account, top up airtime credit, and request a
+1. **Server project.** In Vercel, choose Add New → Project, import this repository again,
+   name it `kalndlord-api`, and set its Root Directory to `apps/api`. Leave the build
+   settings as they are; `apps/api/vercel.json` sets them.
+2. **Database.** In the `kalndlord-api` project, open Storage → Create → Neon (Postgres),
+   free plan, region closest to Rwanda (Frankfurt), and connect it to the project. This
+   adds `DATABASE_URL` and `DATABASE_URL_UNPOOLED` for you. Every deploy brings the
+   database up to date.
+3. **Photos.** Storage → Create → Blob, and connect it. This adds `BLOB_READ_WRITE_TOKEN`.
+4. **SMS (Africa's Talking).** Create an account, top up airtime credit, and request a
    sender ID (e.g. "Kalndlord"). You need the username, API key and sender ID.
-2. **Email.** Any SMTP provider (e.g. Brevo, which has a free plan, or a Google Workspace
+5. **Email.** Any SMTP provider (e.g. Brevo, which has a free plan, or a Google Workspace
    mailbox). You need an `SMTP_URL` like `smtps://user:password@smtp.example.com:465`.
-3. **Railway project.** Sign in to Railway with GitHub, choose New Project → Deploy from
-   GitHub repo, and pick this repository. Railway reads `railway.json`: it builds the
-   server, brings the database up to date and creates the administrator account before
-   each deploy, and checks `/health`.
-4. **Database.** In the project, choose Create → Database → PostgreSQL. In the server's
-   Variables, add `DATABASE_URL` with the value `${{Postgres.DATABASE_URL}}`.
-5. **Photos.** Right-click the server → Attach volume, mount path `/data`. Photos saved
-   there survive redeploys.
-6. **Public address.** Server → Settings → Networking → Generate Domain. This is the
-   server's address, e.g. `https://kalndlord-api.up.railway.app`.
-7. **Server settings.** In the server's Variables, add:
+6. **Server settings.** In `kalndlord-api` → Settings → Environment Variables, add:
 
    | Name | Value |
    | --- | --- |
    | `NODE_ENV` | `production` |
    | `JWT_SECRET` | a long random string (40+ characters) |
-   | `PUBLIC_API_URL` | the server's address from step 6 |
-   | `UPLOAD_DIR` | `/data/uploads` |
+   | `CRON_SECRET` | another long random string (Vercel's daily timer uses it) |
+   | `PUBLIC_API_URL` | the server's address, e.g. `https://kalndlord-api.vercel.app` |
    | `CORS_ORIGINS` | the website's address, e.g. `https://kalndlord.vercel.app` |
    | `PAYMENT_REDIRECTS` | `https://kalndlord.vercel.app/,kalndlord://` |
    | `PAYMENT_PROVIDER` | `off` (until Flutterwave is ready) |
+   | `STORAGE` | `blob` |
    | `SMS_PROVIDER` | `africastalking`, plus `AT_USERNAME`, `AT_API_KEY`, `AT_SENDER_ID` |
    | `EMAIL_PROVIDER` | `smtp`, plus `SMTP_URL` and `EMAIL_FROM` |
    | `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME` | your administrator account |
 
-   Railway redeploys when variables change. The administrator account is created on the
-   first deploy that has these set; an existing account keeps its password. Rent bills
-   and reminders run inside the server every hour (`RENT_JOB_MINUTES`).
-8. **Website.** In the Vercel website project's settings, set `API_URL` to the server's
+   Then redeploy. The administrator account is created on the first deploy that has
+   these set; an existing account keeps its password.
+7. **Website.** In the existing website project's settings, set `API_URL` to the server's
    address and `WEB_URL` to the website's address, then redeploy.
+8. **Rent bills and reminders** run once a day at 08:00 Kigali time from Vercel's timer
+   (`crons` in `apps/api/vercel.json`); nothing to set up beyond `CRON_SECRET`.
 9. **Payments (Flutterwave).** When your Flutterwave account is verified, follow "Taking
    real payments" above and change `PAYMENT_PROVIDER` to `flutterwave`.
 10. **Android test app.** Install the Expo tools (`npm i -g eas-cli`), sign in with a free
@@ -82,6 +83,10 @@ dashboards, never into the code or a chat.
     link to share with beta testers. For the Play Store use `--profile production`.
 11. **Try it end to end** with a few real landlords and tenants: sign up, list, apply,
     accept, record a payment, report a problem, and reset a password.
+
+The API also runs as an ordinary Node server (`node apps/api/dist/server.js`) on any other
+host; there the rent job runs inside the server every `RENT_JOB_MINUTES`, and photos can
+go to any S3-compatible bucket (`STORAGE=s3`, see `.env.example`).
 
 ## Run it locally
 
@@ -143,10 +148,10 @@ A payment only counts once the API has confirmed it with Flutterwave for the ful
 ## Photos
 
 Listing photos (JPG, PNG or WebP, up to 5 MB, 8 per listing) and report photos (4 per
-report) are resized to at most 1600px in the browser and the app before upload, which
-keeps uploads quick on mobile data. They are saved in `UPLOAD_DIR` (`apps/api/uploads`
-locally, the Railway volume in production) and served from `PUBLIC_API_URL/uploads`.
-They can go to an S3-compatible bucket instead (`STORAGE=s3`, see `.env.example`). Photo addresses use random names that
+report) are resized to at most 1600px in the browser and the app before upload, to stay
+under Vercel's 4.5 MB request limit. In development they are saved in `apps/api/uploads`
+and served from `PUBLIC_API_URL/uploads`. Before launch this should move to cloud storage;
+only `apps/api/src/lib/storage.ts` needs to change. Photo addresses use random names that
 can't be guessed, but anyone holding a link can open it.
 
 On the mobile app, set `EXPO_PUBLIC_API_URL` to an address your phone can reach (your
