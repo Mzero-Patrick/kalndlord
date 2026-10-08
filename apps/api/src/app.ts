@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import express, { type NextFunction, type Request, type Response } from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -15,8 +14,7 @@ import { inquiriesRouter } from "./routes/inquiries";
 import { paymentsRouter } from "./routes/payments";
 import { noticesRouter } from "./routes/notices";
 import { issuesRouter } from "./routes/issues";
-import { blobStorage, localStorage, s3Storage, type Storage } from "./lib/storage";
-import { runRentJob } from "./lib/billing";
+import { localStorage, s3Storage, type Storage } from "./lib/storage";
 import { flutterwave, paymentsOff, sandbox, type PaymentGateway } from "./lib/gateway";
 import { sendError } from "./lib/http";
 
@@ -37,11 +35,7 @@ export function createGateway(config: Config): PaymentGateway {
 
 export function createApp({ prisma, notifier, config, storage, gateway, rateLimit: limit = true }: AppDeps) {
   const app = express();
-  const photos =
-    storage ??
-    (config.blobToken ? blobStorage(config.blobToken)
-      : config.s3 ? s3Storage(config.s3)
-      : localStorage(config.uploadDir, config.publicUrl));
+  const photos = storage ?? (config.s3 ? s3Storage(config.s3) : localStorage(config.uploadDir, config.publicUrl));
   app.set("trust proxy", 1);
   app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
   app.use(cors({ origin: config.corsOrigins }));
@@ -53,16 +47,6 @@ export function createApp({ prisma, notifier, config, storage, gateway, rateLimi
 
   app.get("/health", (_req, res) => res.json({ ok: true }));
 
-  // Monthly bills and rent reminders, for hosts without a long-running server
-  // (Vercel calls this once a day with CRON_SECRET). Safe to run repeatedly.
-  app.get("/jobs/rent", async (req, res) => {
-    const expected = Buffer.from(`Bearer ${config.cronSecret ?? ""}`);
-    const given = Buffer.from(req.headers.authorization ?? "");
-    if (!config.cronSecret || given.length !== expected.length || !crypto.timingSafeEqual(given, expected))
-      return sendError(res, 404, "Not found");
-    const result = await runRentJob(prisma, notifier, new Date(), config.payments.provider !== "off");
-    res.json(result);
-  });
   app.use("/auth", authRouter(prisma, notifier, config));
   app.use("/dashboard", dashboardRouter(prisma, config));
   app.use("/listings", listingsRouter(prisma, notifier, photos, config));

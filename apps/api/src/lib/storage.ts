@@ -2,10 +2,9 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { del, put } from "@vercel/blob";
 
-// Photo storage: local disk (served from /uploads) for development; Vercel Blob
-// or an S3-compatible bucket (Cloudflare R2, AWS S3) in production.
+// Photo storage: a local or mounted disk (served from /uploads), or an
+// S3-compatible bucket such as Cloudflare R2 or AWS S3.
 export interface Storage {
   save(data: Buffer, ext: string): Promise<string>;
   remove(key: string): Promise<void>;
@@ -63,26 +62,6 @@ export function s3Storage(settings: S3Settings): Storage {
       await client.send(new DeleteObjectCommand({ Bucket: settings.bucket, Key: path.basename(key) }));
     },
     url: (key) => `${base}/${key}`,
-  };
-}
-
-// Vercel Blob. Blob addresses can't be worked out from a name, so the saved
-// key is the photo's full public address.
-export function blobStorage(token: string): Storage {
-  return {
-    async save(data, ext) {
-      const blob = await put(`photos/${crypto.randomUUID()}.${ext}`, data, {
-        access: "public",
-        contentType: CONTENT_TYPE[ext],
-        cacheControlMaxAge: 60 * 60 * 24 * 30,
-        token,
-      });
-      return blob.url;
-    },
-    async remove(key) {
-      await del(key, { token });
-    },
-    url: (key) => key,
   };
 }
 

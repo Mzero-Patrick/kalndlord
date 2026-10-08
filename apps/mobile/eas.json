@@ -4,11 +4,11 @@
     "preview": {
       "distribution": "internal",
       "android": { "buildType": "apk" },
-      "env": { "EXPO_PUBLIC_API_URL": "https://kalndlord-api.vercel.app" }
+      "env": { "EXPO_PUBLIC_API_URL": "https://kalndlord-api.up.railway.app" }
     },
     "production": {
       "autoIncrement": true,
-      "env": { "EXPO_PUBLIC_API_URL": "https://kalndlord-api.vercel.app" }
+      "env": { "EXPO_PUBLIC_API_URL": "https://kalndlord-api.up.railway.app" }
     }
   },
   "submit": { "production": {} }
