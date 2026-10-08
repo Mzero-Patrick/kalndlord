@@ -78,3 +78,29 @@ export function ReplyForm({ inquiryId, onSent }: { inquiryId: string; onSent: ()
     </View>
   );
 }
+
+// Landlord or administrator notice to all of their tenants.
+export function NoticeForm({ label }: { label: string }) {
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
+  const [state, setState] = useState<{ error?: string; ok?: string }>({});
+  const [busy, setBusy] = useState(false);
+  async function send() {
+    setBusy(true);
+    const res = await api<{ sent: number }>("/notices", { to: "ALL", subject, message });
+    setBusy(false);
+    if (!res.ok) return setState({ error: res.data.error });
+    setSubject("");
+    setMessage("");
+    setState({ ok: `Sent to ${res.data.sent} tenant${res.data.sent === 1 ? "" : "s"}` });
+  }
+  return (
+    <View style={{ gap: 10 }}>
+      <Banner text={state.error} />
+      <Banner text={state.ok} kind="ok" />
+      <Field label="Subject" value={subject} onChangeText={setSubject} placeholder="e.g. Water cut on Monday" />
+      <Field label="Message" value={message} onChangeText={setMessage} multiline style={{ minHeight: 80, textAlignVertical: "top" }} />
+      <Button title={label} onPress={send} busy={busy} />
+    </View>
+  );
+}

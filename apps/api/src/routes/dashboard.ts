@@ -4,8 +4,33 @@ import type { Config } from "../config";
 import { requireAuth } from "../middleware/auth";
 import { toPublicUser } from "../lib/users";
 
-// Role-gated dashboard summaries. Payments and maintenance figures are added in
-// the later steps.
+const monthStart = () => {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+};
+
+// Rent collected this month and rent still owed, optionally for one landlord.
+async function rentFigures(prisma: PrismaClient, landlordId?: string) {
+  const lease = landlordId ? { landlordId } : {};
+  const [collected, owed] = await Promise.all([
+    prisma.payment.aggregate({
+      _sum: { amount: true },
+      where: { status: "SUCCESSFUL", paidAt: { gte: monthStart() }, charge: { lease } },
+    }),
+    prisma.rentCharge.aggregate({
+      _sum: { amount: true },
+      _count: { _all: true },
+      where: { status: "DUE", dueDate: { lte: new Date() }, lease },
+    }),
+  ]);
+  return {
+    collectedThisMonth: collected._sum.amount ?? 0,
+    owed: owed._sum.amount ?? 0,
+    unpaidBills: owed._count._all,
+  };
+}
+
+// Role-gated dashboard summaries. Maintenance figures are added in step 4.
 export function dashboardRouter(prisma: PrismaClient, config: Config) {
   const router = Router();
 
@@ -28,6 +53,7 @@ export function dashboardRouter(prisma: PrismaClient, config: Config) {
       activeLeases,
       unansweredQuestions,
       landlords,
+      ...(await rentFigures(prisma)),
     });
   });
 
@@ -39,16 +65,31 @@ export function dashboardRouter(prisma: PrismaClient, config: Config) {
       prisma.application.count({ where: { status: "PENDING", property: { landlordId: id } } }),
       prisma.inquiry.count({ where: { reply: null, property: { landlordId: id } } }),
     ]);
-    res.json({ user: toPublicUser(req.user!), listings, tenants, pendingApplications, unansweredQuestions, openRequests: 0 });
+    res.json({
+      user: toPublicUser(req.user!),
+      listings,
+      tenants,
+      pendingApplications,
+      unansweredQuestions,
+      openRequests: 0,
+      ...(await rentFigures(prisma, id)),
+    });
   });
 
   router.get("/tenant", requireAuth(prisma, config.jwtSecret, ["TENANT"]), async (req, res) => {
     const id = req.user!.id;
-    const [leases, pendingApplications] = await Promise.all([
+    const [leases, pendingApplications, next] = await Promise.all([
       prisma.lease.count({ where: { tenantId: id, status: "ACTIVE" } }),
       prisma.application.count({ where: { tenantId: id, status: "PENDING" } }),
+      prisma.rentCharge.findFirst({ where: { status: "DUE", lease: { tenantId: id } }, orderBy: { dueDate: "asc" } }),
     ]);
-    res.json({ user: toPublicUser(req.user!), leases, pendingApplications, nextPayment: null, openRequests: 0 });
+    res.json({
+      user: toPublicUser(req.user!),
+      leases,
+      pendingApplications,
+      nextPayment: next ? { amount: next.amount, dueDate: next.dueDate.toISOString(), chargeId: next.id } : null,
+      openRequests: 0,
+    });
   });
 
   return router;

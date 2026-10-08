@@ -11,7 +11,10 @@ import { dashboardRouter } from "./routes/dashboard";
 import { listingsRouter } from "./routes/listings";
 import { applicationsRouter } from "./routes/applications";
 import { inquiriesRouter } from "./routes/inquiries";
+import { paymentsRouter } from "./routes/payments";
+import { noticesRouter } from "./routes/notices";
 import { localStorage, type Storage } from "./lib/storage";
+import { flutterwave, sandbox, type PaymentGateway } from "./lib/gateway";
 import { sendError } from "./lib/http";
 
 export interface AppDeps {
@@ -19,10 +22,17 @@ export interface AppDeps {
   notifier: Notifier;
   config: Config;
   storage?: Storage;
+  gateway?: PaymentGateway;
   rateLimit?: boolean;
 }
 
-export function createApp({ prisma, notifier, config, storage, rateLimit: limit = true }: AppDeps) {
+export function createGateway(config: Config): PaymentGateway {
+  return config.payments.provider === "flutterwave"
+    ? flutterwave(config.payments.flwSecretKey!, config.payments.flwWebhookHash)
+    : sandbox(config.publicUrl);
+}
+
+export function createApp({ prisma, notifier, config, storage, gateway, rateLimit: limit = true }: AppDeps) {
   const app = express();
   const photos = storage ?? localStorage(config.uploadDir, config.publicUrl);
   app.set("trust proxy", 1);
@@ -39,7 +49,9 @@ export function createApp({ prisma, notifier, config, storage, rateLimit: limit 
   app.use("/dashboard", dashboardRouter(prisma, config));
   app.use("/listings", listingsRouter(prisma, notifier, photos, config));
   app.use("/inquiries", inquiriesRouter(prisma, notifier, config));
+  app.use("/notices", noticesRouter(prisma, notifier, config));
   app.use("/", applicationsRouter(prisma, notifier, config));
+  app.use("/", paymentsRouter(prisma, notifier, gateway ?? createGateway(config), config));
   app.use("/uploads", express.static(config.uploadDir, { maxAge: "7d", index: false }));
 
   app.use((_req, res) => sendError(res, 404, "Not found"));

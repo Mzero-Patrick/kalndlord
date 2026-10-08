@@ -36,6 +36,10 @@ model User {
   tenantLeases      Lease[]            @relation("LeaseTenant")
   landlordLeases    Lease[]            @relation("LeaseLandlord")
   inquiries         Inquiry[]
+  payments          Payment[]          @relation("PaymentTenant")
+  recordedPayments  Payment[]          @relation("PaymentRecorder")
+  sentNotices       Notice[]           @relation("NoticeSender")
+  receivedNotices   Notice[]           @relation("NoticeRecipient")
 }
 
 model VerificationCode {
@@ -154,6 +158,8 @@ model Lease {
   status        LeaseStatus @default(ACTIVE)
   createdAt     DateTime    @default(now())
 
+  charges RentCharge[]
+
   @@index([tenantId])
   @@index([landlordId])
 }
@@ -174,4 +180,83 @@ model Inquiry {
 
   @@index([propertyId])
   @@index([fromId])
+}
+
+enum ChargeStatus {
+  DUE
+  PAID
+}
+
+// One month's rent for a lease. Created by the rent job; paid by one
+// successful Payment.
+model RentCharge {
+  id            String       @id @default(cuid())
+  leaseId       String
+  lease         Lease        @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+  period        String // "2026-10"
+  amount        Int
+  dueDate       DateTime
+  status        ChargeStatus @default(DUE)
+  paidAt        DateTime?
+  // 0 none sent, 1 "due soon", 2 "due today", 3 "overdue".
+  reminderStage Int          @default(0)
+  createdAt     DateTime     @default(now())
+
+  payments Payment[]
+
+  @@unique([leaseId, period])
+  @@index([status, dueDate])
+}
+
+enum PaymentMethod {
+  MTN
+  AIRTEL
+  CARD
+  CASH
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESSFUL
+  FAILED
+}
+
+model Payment {
+  id           String         @id @default(cuid())
+  chargeId     String
+  charge       RentCharge     @relation(fields: [chargeId], references: [id], onDelete: Cascade)
+  // The tenant account the payment is recorded against.
+  tenantId     String
+  tenant       User           @relation("PaymentTenant", fields: [tenantId], references: [id])
+  amount       Int
+  method       PaymentMethod?
+  provider     String // "flutterwave", "sandbox" or "manual"
+  txRef        String         @unique
+  providerRef  String?
+  status       PaymentStatus  @default(PENDING)
+  receiptNo    String?        @unique
+  // Set when a landlord or the administrator records a cash payment.
+  recordedById String?
+  recordedBy   User?          @relation("PaymentRecorder", fields: [recordedById], references: [id])
+  paidAt       DateTime?
+  createdAt    DateTime       @default(now())
+
+  @@index([tenantId])
+  @@index([chargeId])
+}
+
+// A message from a landlord or the administrator to tenants.
+model Notice {
+  id          String   @id @default(cuid())
+  senderId    String
+  sender      User     @relation("NoticeSender", fields: [senderId], references: [id])
+  recipientId String
+  recipient   User     @relation("NoticeRecipient", fields: [recipientId], references: [id])
+  subject     String
+  message     String
+  createdAt   DateTime @default(now())
+
+  @@index([recipientId, createdAt])
+  @@index([senderId, createdAt])
 }

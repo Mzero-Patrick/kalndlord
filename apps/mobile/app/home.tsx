@@ -2,10 +2,21 @@ import { useCallback, useState } from "react";
 import { ActivityIndicator, RefreshControl, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Redirect, router, useFocusEffect } from "expo-router";
-import { formatRwf, type Application, type Inquiry, type Lease, type Listing } from "@kalndlord/shared";
+import {
+  formatPeriod,
+  formatRwf,
+  PAYMENT_METHOD_LABEL,
+  type Application,
+  type Inquiry,
+  type Lease,
+  type Listing,
+  type Notice,
+  type RentCharge,
+} from "@kalndlord/shared";
 import { api } from "@/lib/api";
 import { useSession } from "@/lib/session";
-import { ReplyForm } from "@/components/Forms";
+import { NoticeForm, ReplyForm } from "@/components/Forms";
+import { payCharge } from "@/lib/pay";
 import { Banner, Body, Button, Card, Muted, Section, StatusText, Title, usePalette } from "@/components/ui";
 
 type Summary = Record<string, unknown> & { users?: Record<string, number> };
@@ -15,6 +26,8 @@ interface Data {
   leases: Lease[];
   questions: (Inquiry & { canReply?: boolean })[];
   listings: (Listing & { pendingApplications: number })[];
+  charges: RentCharge[];
+  notices: Notice[];
 }
 
 const items = async <T,>(path: string) => {
@@ -33,16 +46,18 @@ export default function Home() {
   const load = useCallback(async () => {
     if (!user) return;
     const manager = user.role !== "TENANT";
-    const [summary, applications, leases, questions, listings] = await Promise.all([
+    const [summary, applications, leases, questions, listings, charges, notices] = await Promise.all([
       api<Summary>(`/dashboard/${user.role.toLowerCase()}`),
       items<Application>("/applications"),
       items<Lease>("/leases"),
       items<Inquiry & { canReply?: boolean }>("/inquiries"),
       manager ? items<Listing & { pendingApplications: number }>("/listings/mine") : Promise.resolve([]),
+      items<RentCharge>("/charges"),
+      items<Notice>("/notices"),
     ]);
     if (!summary.ok) return setError(summary.data.error);
     setError(undefined);
-    setData({ summary: summary.data, applications, leases, questions, listings });
+    setData({ summary: summary.data, applications, leases, questions, listings, charges, notices });
   }, [user]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -52,6 +67,28 @@ export default function Home() {
 
   async function decide(id: string, decision: "accept" | "reject" | "withdraw") {
     const res = await api(`/applications/${id}/${decision}`, {});
+    if (!res.ok) setError(res.data.error);
+    load();
+  }
+
+  const [paying, setPaying] = useState<string>();
+  const [notice, setNotice] = useState<string>();
+
+  async function pay(chargeId: string) {
+    setPaying(chargeId);
+    const res = await payCharge(chargeId);
+    setPaying(undefined);
+    if (res.error) setError(res.error);
+    else if (res.payment?.status === "SUCCESSFUL") {
+      setError(undefined);
+      setNotice(`Payment received: ${formatRwf(res.payment.amount)}. Receipt ${res.payment.receiptNo}.`);
+    } else if (res.payment?.status === "FAILED") setError("The payment didn't go through. Nothing was taken.");
+    else setNotice("Waiting for the payment to be confirmed. Pull down to refresh in a minute.");
+    load();
+  }
+
+  async function recordCash(chargeId: string) {
+    const res = await api(`/charges/${chargeId}/cash`, {});
     if (!res.ok) setError(res.data.error);
     load();
   }
@@ -73,6 +110,7 @@ export default function Home() {
       >
         <Title>{user.role === "ADMIN" ? "Administrator" : `Welcome, ${user.fullName}`}</Title>
         <Banner text={error} />
+        <Banner text={notice} kind="ok" />
         <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
           <View style={{ flex: 1 }}><Button title="Find a place" secondary={!tenant} onPress={() => router.push("/listings")} /></View>
           {!tenant && <View style={{ flex: 1 }}><Button title="List a place" onPress={() => router.push("/listings/new")} /></View>}
@@ -87,8 +125,46 @@ export default function Home() {
               </View>
             )}
 
+
+            <Section title="Rent">
+              {data.charges.length === 0 && <Muted>No rent bills yet.</Muted>}
+              {[...data.charges].sort((a, b) => (a.status === b.status ? 0 : a.status === "DUE" ? -1 : 1)).map((ch) => (
+                <View key={ch.id} style={{ gap: 4 }}>
+                  <Body bold>{formatPeriod(ch.period)} · {formatRwf(ch.amount)}</Body>
+                  <Body muted>{ch.lease.property.title}{tenant ? "" : ` · ${ch.lease.tenant.fullName}`}</Body>
+                  {ch.status === "PAID" ? (
+                    <Text style={{ color: c.ok }} onPress={() => ch.payment && router.push(`/receipts/${ch.payment.id}`)}>
+                      Paid{ch.payment?.method ? ` with ${PAYMENT_METHOD_LABEL[ch.payment.method]}` : ""} · View receipt
+                    </Text>
+                  ) : (
+                    <>
+                      <Text style={{ color: ch.overdue ? c.danger : "#b54708" }}>
+                        {ch.overdue ? "Overdue" : "Due"} {new Date(ch.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                      </Text>
+                      {tenant ? (
+                        <Button title="Pay with MoMo, Airtel or card" onPress={() => pay(ch.id)} busy={paying === ch.id} />
+                      ) : (
+                        <Button title="Record cash payment" secondary onPress={() => recordCash(ch.id)} />
+                      )}
+                    </>
+                  )}
+                </View>
+              ))}
+            </Section>
+
             {tenant ? (
               <>
+                {data.notices.length > 0 && (
+                  <Section title="Notices">
+                    {data.notices.slice(0, 5).map((n) => (
+                      <View key={n.id} style={{ gap: 2 }}>
+                        <Body bold>{n.subject}</Body>
+                        <Body muted>From {n.sender.fullName}</Body>
+                        <Body>{n.message}</Body>
+                      </View>
+                    ))}
+                  </Section>
+                )}
                 <Section title="My rentals">
                   {data.leases.length === 0 && <Muted>No rentals yet.</Muted>}
                   {data.leases.map((l) => (
@@ -139,6 +215,11 @@ export default function Home() {
                   {data.leases.length === 0 && <Muted>No tenants yet.</Muted>}
                   {data.leases.map((l) => <Body key={l.id}>{l.tenant.fullName} · {l.property.title}</Body>)}
                 </Section>
+                {(data.leases.length > 0 || user.role === "ADMIN") && (
+                  <Section title="Send a notice">
+                    <NoticeForm label={user.role === "ADMIN" ? "Send to every tenant" : "Send to all my tenants"} />
+                  </Section>
+                )}
               </>
             )}
 

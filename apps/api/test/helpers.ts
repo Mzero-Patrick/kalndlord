@@ -5,6 +5,7 @@ import { PrismaClient } from "@prisma/client";
 import { createApp } from "../src/app";
 import type { Config } from "../src/config";
 import type { Notifier } from "../src/notify";
+import type { PaymentGateway } from "../src/lib/gateway";
 
 export const config: Config = {
   port: 0,
@@ -12,6 +13,8 @@ export const config: Config = {
   corsOrigins: ["http://localhost:3000"],
   publicUrl: "http://localhost:4000",
   uploadDir: "uploads-test",
+  payments: { provider: "sandbox", allowedRedirects: ["http://localhost:3000/", "kalndlord://"] },
+  rentJobMinutes: 0,
   sms: { provider: "console" },
   email: { provider: "console", from: "test@example.com" },
 };
@@ -33,17 +36,20 @@ export class MemoryNotifier implements Notifier {
   }
 }
 
-export function setup() {
+export function setup(gateway?: PaymentGateway) {
   const prisma = new PrismaClient({
     datasourceUrl:
       process.env.TEST_DATABASE_URL ?? "postgresql://kalndlord:kalndlord@localhost:5432/kalndlord_test",
   });
   const notifier = new MemoryNotifier();
-  const app = createApp({ prisma, notifier, config, rateLimit: false });
+  const app = createApp({ prisma, notifier, config, gateway, rateLimit: false });
   return { prisma, notifier, app };
 }
 
 export async function resetDb(prisma: PrismaClient) {
+  await prisma.notice.deleteMany();
+  await prisma.payment.deleteMany();
+  await prisma.rentCharge.deleteMany();
   await prisma.inquiry.deleteMany();
   await prisma.lease.deleteMany();
   await prisma.application.deleteMany();
@@ -67,4 +73,28 @@ export async function makeUser(
   });
   const res = await request(app).post("/auth/login").send({ identifier: phone, password: "password1" });
   return { user, auth: { Authorization: `Bearer ${res.body.token}` } };
+}
+
+// A landlord with one place rented to one tenant, ready for billing tests.
+export async function rentedPlace(app: Express, prisma: PrismaClient, rent = 200000) {
+  const landlord = await makeUser(app, prisma, "LANDLORD");
+  const tenant = await makeUser(app, prisma, "TENANT");
+  const listing = await request(app)
+    .post("/listings")
+    .set(landlord.auth)
+    .send({
+      title: "Shop on KN 3 Ave",
+      type: "SHOP",
+      description: "Street-facing shop with a storeroom.",
+      district: "Nyarugenge",
+      sector: "Nyarugenge",
+      monthlyRent: rent,
+      terms: "Rent is due monthly. No subletting.",
+    });
+  const application = await request(app)
+    .post(`/listings/${listing.body.listing.id}/applications`)
+    .set(tenant.auth)
+    .send({ acceptTerms: true });
+  const accepted = await request(app).post(`/applications/${application.body.application.id}/accept`).set(landlord.auth);
+  return { landlord, tenant, leaseId: accepted.body.lease.id as string, propertyId: listing.body.listing.id as string };
 }
