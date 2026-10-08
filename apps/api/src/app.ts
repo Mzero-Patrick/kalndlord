@@ -14,8 +14,8 @@ import { inquiriesRouter } from "./routes/inquiries";
 import { paymentsRouter } from "./routes/payments";
 import { noticesRouter } from "./routes/notices";
 import { issuesRouter } from "./routes/issues";
-import { localStorage, type Storage } from "./lib/storage";
-import { flutterwave, sandbox, type PaymentGateway } from "./lib/gateway";
+import { localStorage, s3Storage, type Storage } from "./lib/storage";
+import { flutterwave, paymentsOff, sandbox, type PaymentGateway } from "./lib/gateway";
 import { sendError } from "./lib/http";
 
 export interface AppDeps {
@@ -28,14 +28,14 @@ export interface AppDeps {
 }
 
 export function createGateway(config: Config): PaymentGateway {
-  return config.payments.provider === "flutterwave"
-    ? flutterwave(config.payments.flwSecretKey!, config.payments.flwWebhookHash)
-    : sandbox(config.publicUrl);
+  if (config.payments.provider === "flutterwave")
+    return flutterwave(config.payments.flwSecretKey!, config.payments.flwWebhookHash);
+  return config.payments.provider === "off" ? paymentsOff : sandbox(config.publicUrl);
 }
 
 export function createApp({ prisma, notifier, config, storage, gateway, rateLimit: limit = true }: AppDeps) {
   const app = express();
-  const photos = storage ?? localStorage(config.uploadDir, config.publicUrl);
+  const photos = storage ?? (config.s3 ? s3Storage(config.s3) : localStorage(config.uploadDir, config.publicUrl));
   app.set("trust proxy", 1);
   app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
   app.use(cors({ origin: config.corsOrigins }));
@@ -46,6 +46,7 @@ export function createApp({ prisma, notifier, config, storage, gateway, rateLimi
   }
 
   app.get("/health", (_req, res) => res.json({ ok: true }));
+
   app.use("/auth", authRouter(prisma, notifier, config));
   app.use("/dashboard", dashboardRouter(prisma, config));
   app.use("/listings", listingsRouter(prisma, notifier, photos, config));

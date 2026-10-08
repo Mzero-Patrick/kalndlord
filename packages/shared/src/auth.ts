@@ -65,6 +65,15 @@ export const loginSchema = z.object({
 });
 export type LoginInput = z.infer<typeof loginSchema>;
 
+// Forgotten password: a code goes to the phone or email given, then the
+// code and a new password reset it.
+export const forgotSchema = z.object({ identifier: z.string().trim().min(3, "Enter your phone or email") });
+export const resetSchema = z.object({
+  identifier: z.string().trim().min(3, "Enter your phone or email"),
+  code: z.string().trim().regex(/^\d{6}$/, "The code has 6 digits"),
+  password: passwordSchema,
+});
+
 export interface PublicUser {
   id: string;
   fullName: string;

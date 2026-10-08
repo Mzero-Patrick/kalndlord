@@ -2,10 +2,12 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import type { PrismaClient } from "@prisma/client";
 import {
+  forgotSchema,
   loginSchema,
   normalizeRwandaPhone,
   registerSchema,
   resendSchema,
+  resetSchema,
   verifySchema,
   type AuthResponse,
   type RegisterResponse,
@@ -114,6 +116,57 @@ export function authRouter(prisma: PrismaClient, notifier: Notifier, config: Con
     if (!isVerified(user)) {
       return res.status(403).json({ error: "Verify your account first", needsVerification: true, userId: user.id });
     }
+    const body: AuthResponse = {
+      token: signToken(config.jwtSecret, { sub: user.id, role: user.role }),
+      user: toPublicUser(user),
+    };
+    res.json(body);
+  });
+
+  // Finds the account by the phone or email typed in; the code goes to that
+  // same contact. The answer is the same whether or not the account exists.
+  async function findByIdentifier(identifier: string) {
+    const phone = normalizeRwandaPhone(identifier);
+    const user = phone
+      ? await prisma.user.findUnique({ where: { phone } })
+      : await prisma.user.findUnique({ where: { email: identifier.toLowerCase() } });
+    return user ? { user, channel: (phone ? "PHONE" : "EMAIL") as "PHONE" | "EMAIL", destination: (phone ?? user.email)! } : null;
+  }
+
+  router.post("/forgot", async (req, res) => {
+    const parsed = forgotSchema.safeParse(req.body);
+    if (!parsed.success) return sendError(res, 400, "Check the highlighted fields", zodFields(parsed.error));
+    const found = await findByIdentifier(parsed.data.identifier);
+    if (found) {
+      const last = await prisma.verificationCode.findFirst({
+        where: { userId: found.user.id },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!last || Date.now() - last.createdAt.getTime() >= RESEND_COOLDOWN_MS) {
+        await issueCode(prisma, notifier, found.user.id, found.channel, found.destination, "reset");
+      }
+    }
+    res.json({ ok: true });
+  });
+
+  router.post("/reset", async (req, res) => {
+    const parsed = resetSchema.safeParse(req.body);
+    if (!parsed.success) return sendError(res, 400, "Check the highlighted fields", zodFields(parsed.error));
+    const { identifier, code, password } = parsed.data;
+    const found = await findByIdentifier(identifier);
+    if (!found) return sendError(res, 400, CHECK_MESSAGES.invalid, { code: CHECK_MESSAGES.invalid });
+
+    const check = await checkCode(prisma, found.user.id, code);
+    if (check.result !== "ok") return sendError(res, 400, CHECK_MESSAGES[check.result], { code: CHECK_MESSAGES[check.result] });
+
+    // Receiving the code also proves the contact belongs to them.
+    const user = await prisma.user.update({
+      where: { id: found.user.id },
+      data: {
+        passwordHash: await bcrypt.hash(password, 12),
+        ...(check.channel === "PHONE" ? { phoneVerifiedAt: found.user.phoneVerifiedAt ?? new Date() } : { emailVerifiedAt: found.user.emailVerifiedAt ?? new Date() }),
+      },
+    });
     const body: AuthResponse = {
       token: signToken(config.jwtSecret, { sub: user.id, role: user.role }),
       user: toPublicUser(user),

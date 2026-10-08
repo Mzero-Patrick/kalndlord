@@ -88,6 +88,51 @@ describe("login", () => {
   });
 });
 
+describe("forgotten password", () => {
+  // Codes are throttled to one a minute, so age the sign-up code first.
+  const ageCodes = () => prisma.verificationCode.updateMany({ data: { createdAt: new Date(Date.now() - 120_000) } });
+
+  it("resets the password with a code sent to the phone given", async () => {
+    await registerAndVerify({ ...tenant, email: "aline@example.rw" }, "+250788123456");
+    await ageCodes();
+    notifier.sent = [];
+    await request(app).post("/auth/forgot").send({ identifier: "0788 123 456" }).expect(200);
+    expect(notifier.sent).toHaveLength(1);
+    expect(notifier.sent[0]).toMatchObject({ to: "+250788123456", text: expect.stringMatching(/reset code/) });
+
+    const bad = await request(app).post("/auth/reset")
+      .send({ identifier: "0788123456", code: "000000", password: "newsecret1" });
+    if (notifier.lastCode("+250788123456") !== "000000") expect(bad.status).toBe(400);
+    const res = await request(app).post("/auth/reset")
+      .send({ identifier: "0788123456", code: notifier.lastCode("+250788123456"), password: "newsecret1" })
+      .expect(200);
+    expect(res.body.token).toBeTruthy();
+    await request(app).post("/auth/login").send({ identifier: "0788123456", password: "secret123" }).expect(401);
+    await request(app).post("/auth/login").send({ identifier: "aline@example.rw", password: "newsecret1" }).expect(200);
+  });
+
+  it("sends the code by email when the email is given, and doesn't reveal unknown accounts", async () => {
+    await registerAndVerify({ ...tenant, email: "aline@example.rw" }, "+250788123456");
+    await ageCodes();
+    notifier.sent = [];
+    await request(app).post("/auth/forgot").send({ identifier: "Aline@Example.rw" }).expect(200);
+    expect(notifier.sent.map((m) => m.to)).toEqual(["aline@example.rw"]);
+
+    const unknown = await request(app).post("/auth/forgot").send({ identifier: "nobody@example.rw" }).expect(200);
+    expect(unknown.body).toEqual({ ok: true });
+    expect(notifier.sent).toHaveLength(1);
+    await request(app).post("/auth/reset")
+      .send({ identifier: "nobody@example.rw", code: "123456", password: "newsecret1" }).expect(400);
+  });
+
+  it("throttles reset codes", async () => {
+    await registerAndVerify(tenant, "+250788123456");
+    notifier.sent = [];
+    await request(app).post("/auth/forgot").send({ identifier: "0788123456" }).expect(200);
+    expect(notifier.sent).toHaveLength(0);
+  });
+});
+
 describe("dashboards by role", () => {
   it("lets each role reach only its dashboard", async () => {
     const t = await registerAndVerify(tenant, "+250788123456");

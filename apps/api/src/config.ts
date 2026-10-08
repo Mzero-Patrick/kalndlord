@@ -1,4 +1,5 @@
 import "dotenv/config";
+import type { S3Settings } from "./lib/storage";
 
 function required(name: string): string {
   const value = process.env[name];
@@ -13,8 +14,11 @@ export interface Config {
   // Address the API is reachable at, used to build photo links.
   publicUrl: string;
   uploadDir: string;
+  // Set when photos go to cloud storage instead of uploadDir.
+  s3?: S3Settings;
   payments: {
-    provider: "sandbox" | "flutterwave";
+    // "off" hides online payment (landlords still record cash) until Flutterwave is set up.
+    provider: "sandbox" | "flutterwave" | "off";
     flwSecretKey?: string;
     flwWebhookHash?: string;
     // Where the payment page may send people back to (web app and mobile app links).
@@ -34,8 +38,22 @@ export function loadConfig(): Config {
   if (process.env.PAYMENT_PROVIDER === "flutterwave" && !process.env.FLW_SECRET_KEY) {
     throw new Error("FLW_SECRET_KEY is required when PAYMENT_PROVIDER is flutterwave");
   }
-  if (process.env.NODE_ENV === "production" && process.env.PAYMENT_PROVIDER !== "flutterwave") {
-    throw new Error("Set PAYMENT_PROVIDER=flutterwave in production; the sandbox moves no money");
+  const provider = process.env.PAYMENT_PROVIDER;
+  if (process.env.NODE_ENV === "production" && provider !== "flutterwave" && provider !== "off") {
+    throw new Error("Set PAYMENT_PROVIDER to flutterwave (or off) in production; the sandbox moves no money");
+  }
+  let s3: S3Settings | undefined;
+  if (process.env.STORAGE === "s3") {
+    s3 = {
+      bucket: required("S3_BUCKET"),
+      region: process.env.S3_REGION ?? "auto",
+      endpoint: process.env.S3_ENDPOINT || undefined,
+      accessKeyId: required("S3_ACCESS_KEY_ID"),
+      secretAccessKey: required("S3_SECRET_ACCESS_KEY"),
+      publicUrl: required("S3_PUBLIC_URL"),
+    };
+  } else if (process.env.NODE_ENV === "production" && !process.env.UPLOAD_DIR) {
+    console.warn("Set UPLOAD_DIR to a mounted volume (or STORAGE=s3) so photos survive redeploys.");
   }
   return {
     port: Number(process.env.PORT ?? 4000),
@@ -43,8 +61,9 @@ export function loadConfig(): Config {
     corsOrigins: (process.env.CORS_ORIGINS ?? "http://localhost:3000").split(",").map((s) => s.trim()),
     publicUrl: (process.env.PUBLIC_API_URL ?? `http://localhost:${process.env.PORT ?? 4000}`).replace(/\/$/, ""),
     uploadDir: process.env.UPLOAD_DIR ?? "uploads",
+    s3,
     payments: {
-      provider: process.env.PAYMENT_PROVIDER === "flutterwave" ? "flutterwave" : "sandbox",
+      provider: provider === "flutterwave" || provider === "off" ? provider : "sandbox",
       flwSecretKey: process.env.FLW_SECRET_KEY,
       flwWebhookHash: process.env.FLW_WEBHOOK_HASH,
       allowedRedirects: (process.env.PAYMENT_REDIRECTS ?? "http://localhost:3000/,kalndlord://,exp://")

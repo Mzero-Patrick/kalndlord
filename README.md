@@ -27,7 +27,61 @@ report maintenance or other issues.
    use the same place to raise other business issues with their landlord. The landlord
    (or administrator) marks each report "being fixed" and "done"; both sides get an SMS
    or email on every update, and the tenant can reopen a report that isn't fixed.
-   **Next: beta launch.**
+5. **Beta launch** (ready to deploy): forgotten-password reset by SMS or email code,
+   hosting setup (website on Vercel; server, database and photos on Railway), and
+   Android test builds of the app. See [Launch checklist](#launch-checklist).
+
+## Launch checklist
+
+The website runs on Vercel (already connected). The server, its PostgreSQL database and
+uploaded photos run on Railway. Keys and passwords go into the Railway and Vercel
+dashboards, never into the code or a chat.
+
+> Railway gives new accounts trial credit; after that the Hobby plan is about $5 a month,
+> which covers a beta of this size.
+
+1. **SMS (Africa's Talking).** Create an account, top up airtime credit, and request a
+   sender ID (e.g. "Kalndlord"). You need the username, API key and sender ID.
+2. **Email.** Any SMTP provider (e.g. Brevo, which has a free plan, or a Google Workspace
+   mailbox). You need an `SMTP_URL` like `smtps://user:password@smtp.example.com:465`.
+3. **Railway project.** Sign in to Railway with GitHub, choose New Project → Deploy from
+   GitHub repo, and pick this repository. Railway reads `railway.json`: it builds the
+   server, brings the database up to date and creates the administrator account before
+   each deploy, and checks `/health`.
+4. **Database.** In the project, choose Create → Database → PostgreSQL. In the server's
+   Variables, add `DATABASE_URL` with the value `${{Postgres.DATABASE_URL}}`.
+5. **Photos.** Right-click the server → Attach volume, mount path `/data`. Photos saved
+   there survive redeploys.
+6. **Public address.** Server → Settings → Networking → Generate Domain. This is the
+   server's address, e.g. `https://kalndlord-api.up.railway.app`.
+7. **Server settings.** In the server's Variables, add:
+
+   | Name | Value |
+   | --- | --- |
+   | `NODE_ENV` | `production` |
+   | `JWT_SECRET` | a long random string (40+ characters) |
+   | `PUBLIC_API_URL` | the server's address from step 6 |
+   | `UPLOAD_DIR` | `/data/uploads` |
+   | `CORS_ORIGINS` | the website's address, e.g. `https://kalndlord.vercel.app` |
+   | `PAYMENT_REDIRECTS` | `https://kalndlord.vercel.app/,kalndlord://` |
+   | `PAYMENT_PROVIDER` | `off` (until Flutterwave is ready) |
+   | `SMS_PROVIDER` | `africastalking`, plus `AT_USERNAME`, `AT_API_KEY`, `AT_SENDER_ID` |
+   | `EMAIL_PROVIDER` | `smtp`, plus `SMTP_URL` and `EMAIL_FROM` |
+   | `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME` | your administrator account |
+
+   Railway redeploys when variables change. The administrator account is created on the
+   first deploy that has these set; an existing account keeps its password. Rent bills
+   and reminders run inside the server every hour (`RENT_JOB_MINUTES`).
+8. **Website.** In the Vercel website project's settings, set `API_URL` to the server's
+   address and `WEB_URL` to the website's address, then redeploy.
+9. **Payments (Flutterwave).** When your Flutterwave account is verified, follow "Taking
+   real payments" above and change `PAYMENT_PROVIDER` to `flutterwave`.
+10. **Android test app.** Install the Expo tools (`npm i -g eas-cli`), sign in with a free
+    Expo account, set the server's address in `apps/mobile/eas.json`, then run
+    `cd apps/mobile && eas build --profile preview --platform android`. It gives an APK
+    link to share with beta testers. For the Play Store use `--profile production`.
+11. **Try it end to end** with a few real landlords and tenants: sign up, list, apply,
+    accept, record a payment, report a problem, and reset a password.
 
 ## Run it locally
 
@@ -73,7 +127,8 @@ to repeat.
 
 **Test mode.** With `PAYMENT_PROVIDER="sandbox"` (the default), a local test page stands in
 for the payment provider and no money moves. The API refuses to start in production in
-this mode.
+this mode. Until Flutterwave is ready, use `PAYMENT_PROVIDER="off"`: tenants are told to
+pay their landlord, and landlords record cash as before.
 
 **Taking real payments (Flutterwave).**
 1. Create a Flutterwave business account for Rwanda and complete their verification.
@@ -88,9 +143,10 @@ A payment only counts once the API has confirmed it with Flutterwave for the ful
 ## Photos
 
 Listing photos (JPG, PNG or WebP, up to 5 MB, 8 per listing) and report photos (4 per
-report) are saved in `apps/api/uploads`
-and served from `PUBLIC_API_URL/uploads`. Before launch this should move to cloud storage;
-only `apps/api/src/lib/storage.ts` needs to change. Photo addresses use random names that
+report) are resized to at most 1600px in the browser and the app before upload, which
+keeps uploads quick on mobile data. They are saved in `UPLOAD_DIR` (`apps/api/uploads`
+locally, the Railway volume in production) and served from `PUBLIC_API_URL/uploads`.
+They can go to an S3-compatible bucket instead (`STORAGE=s3`, see `.env.example`). Photo addresses use random names that
 can't be guessed, but anyone holding a link can open it.
 
 On the mobile app, set `EXPO_PUBLIC_API_URL` to an address your phone can reach (your

@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { MAX_ISSUE_PHOTOS, type Issue, type IssueKind, type Lease } from "@kalndlord/shared";
 import { api } from "@/lib/api";
+import { photoFiles } from "@/lib/photos";
 import { Screen } from "@/components/Screen";
 import { Banner, Button, Chip, Field, Muted, Title, usePalette } from "@/components/ui";
 
@@ -45,12 +46,9 @@ export default function ReportIssue() {
     body.append("urgent", urgent ? "true" : "false");
     body.append("subject", subject);
     body.append("message", message);
-    for (const a of photos) {
-      const type = a.mimeType ?? "image/jpeg";
-      // React Native's FormData takes a { uri, name, type } descriptor for files.
-      body.append("photos", { uri: a.uri, name: a.fileName ?? `photo.${type.split("/")[1]}`, type } as unknown as Blob);
-    }
     setBusy(true);
+    // React Native's FormData takes a { uri, name, type } descriptor for files.
+    for (const f of await photoFiles(photos)) body.append("photos", f as unknown as Blob);
     const res = await api<{ issue: Issue }>("/issues", body);
     setBusy(false);
     if (!res.ok) return setState({ error: res.data.error, fields: res.data.fields });

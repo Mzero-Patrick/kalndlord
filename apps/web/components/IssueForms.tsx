@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
+import { shrinkPhotos } from "./shrinkPhotos";
 import { ISSUE_STATUS_LABEL, MAX_ISSUE_PHOTOS, type IssueStatus } from "@kalndlord/shared";
 import type { FormState } from "@/app/actions";
 import { reportIssue, updateIssue } from "@/app/issue-actions";
@@ -8,6 +9,13 @@ import { FieldError } from "./Field";
 
 export function ReportIssueForm({ places }: { places: { leaseId: string; title: string }[] }) {
   const [state, action, pending] = useActionState<FormState, FormData>(reportIssue, {});
+  const [shrinking, setShrinking] = useState(false);
+  const onPhotos = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.currentTarget;
+    setShrinking(true);
+    await shrinkPhotos(input);
+    setShrinking(false);
+  };
   return (
     <form action={action} className="stack" key={state.message}>
       {state.error && <div className="alert" role="alert">{state.error}</div>}
@@ -44,13 +52,13 @@ export function ReportIssueForm({ places }: { places: { leaseId: string; title: 
       </label>
       <label>
         Photos <span className="hint">Optional, up to {MAX_ISSUE_PHOTOS} (JPG, PNG or WebP, 5 MB each)</span>
-        <input type="file" name="photos" accept="image/jpeg,image/png,image/webp" multiple />
+        <input type="file" name="photos" accept="image/jpeg,image/png,image/webp" multiple onChange={onPhotos} />
       </label>
       <label className="checkbox">
         <input type="checkbox" name="urgent" />
         <span>This is urgent (for example no water, no power, or a security problem)</span>
       </label>
-      <div><button type="submit" disabled={pending}>{pending ? "Sending…" : "Send to landlord"}</button></div>
+      <div><button type="submit" disabled={pending || shrinking}>{pending ? "Sending…" : shrinking ? "Preparing photos…" : "Send to landlord"}</button></div>
     </form>
   );
 }

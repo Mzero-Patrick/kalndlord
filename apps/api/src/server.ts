@@ -17,7 +17,7 @@ app.listen(config.port, () => {
 // so running this on several servers at the same time does no harm.
 if (config.rentJobMinutes > 0) {
   const run = () =>
-    runRentJob(prisma, notifier)
+    runRentJob(prisma, notifier, new Date(), config.payments.provider !== "off")
       .then((r) => (r.created || r.reminders) && console.log(`Rent job: ${r.created} bills, ${r.reminders} reminders`))
       .catch((err) => console.error("Rent job failed", err));
   run();
