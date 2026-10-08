@@ -9,6 +9,11 @@ const prisma = new PrismaClient();
 async function main() {
   const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
   const password = process.env.ADMIN_PASSWORD;
+  // Deploys pass --if-configured so a missing admin setting doesn't stop them.
+  if ((!email || !password) && process.argv.includes("--if-configured")) {
+    console.log("ADMIN_EMAIL/ADMIN_PASSWORD not set; skipping the administrator account");
+    return;
+  }
   if (!email || !password || password.length < 8) {
     throw new Error("Set ADMIN_EMAIL and ADMIN_PASSWORD (8+ characters) before seeding");
   }

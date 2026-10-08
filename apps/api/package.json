@@ -18,6 +18,7 @@
     "@aws-sdk/client-s3": "^3.1147.0",
     "@kalndlord/shared": "workspace:*",
     "@prisma/client": "6.19.3",
+    "@vercel/blob": "^2.8.1",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.0",

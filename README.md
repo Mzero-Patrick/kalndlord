@@ -28,42 +28,65 @@ report maintenance or other issues.
    (or administrator) marks each report "being fixed" and "done"; both sides get an SMS
    or email on every update, and the tenant can reopen a report that isn't fixed.
 5. **Beta launch** (ready to deploy): forgotten-password reset by SMS or email code,
-   photos in cloud storage, one-file server and database setup on Render, and Android
-   test builds of the app. See [Launch checklist](#launch-checklist).
+   photos in cloud storage, free hosting of the website, server and database on Vercel,
+   and Android test builds of the app. See [Launch checklist](#launch-checklist).
 
 ## Launch checklist
 
-Each item is an account in your name. Keys and passwords go into the hosting dashboards
-(Render, Vercel), never into the code or a chat.
+Everything runs on Vercel's free (Hobby) plan: the website, the server, a PostgreSQL
+database (Neon, added from Vercel's Storage tab) and photo storage (Vercel Blob). Keys
+and passwords go into the Vercel dashboard, never into the code or a chat.
 
-1. **SMS (Africa's Talking).** Create an account, top up airtime credit, and request a
+> Vercel's free plan is meant for personal, non-commercial use. It is fine for a beta;
+> once Kalndlord charges or earns money, move the team to Vercel Pro. Nothing in the code
+> changes. Neon's and Blob's free allowances are small, so watch their usage pages.
+
+1. **Server project.** In Vercel, choose Add New → Project, import this repository again,
+   name it `kalndlord-api`, and set its Root Directory to `apps/api`. Leave the build
+   settings as they are; `apps/api/vercel.json` sets them.
+2. **Database.** In the `kalndlord-api` project, open Storage → Create → Neon (Postgres),
+   free plan, region closest to Rwanda (Frankfurt), and connect it to the project. This
+   adds `DATABASE_URL` and `DATABASE_URL_UNPOOLED` for you. Every deploy brings the
+   database up to date.
+3. **Photos.** Storage → Create → Blob, and connect it. This adds `BLOB_READ_WRITE_TOKEN`.
+4. **SMS (Africa's Talking).** Create an account, top up airtime credit, and request a
    sender ID (e.g. "Kalndlord"). You need the username, API key and sender ID.
-2. **Email.** Any SMTP provider (e.g. Brevo, Mailgun, or a Google Workspace mailbox).
-   You need an `SMTP_URL` like `smtps://user:password@smtp.example.com:465` and a from
-   address.
-3. **Photo storage (Cloudflare R2, or AWS S3).** Create a bucket, turn on public access
-   (R2: a custom domain or the r2.dev address), and create an access key with write
-   access to that bucket. You need the bucket name, endpoint, key ID, secret and public
-   address.
-4. **Server and database (Render).** In Render, choose New → Blueprint and pick this
-   repository. `render.yaml` creates the API and a PostgreSQL database in Frankfurt.
-   Fill in the values it asks for: the items above, `ADMIN_EMAIL` and `ADMIN_PASSWORD`
-   for your administrator account, and the addresses below. Each deploy applies
-   database changes and creates the administrator account if it is missing.
-   - `PUBLIC_API_URL`: the API address Render gives you, e.g. `https://kalndlord-api.onrender.com`
-   - `CORS_ORIGINS`: the website address, e.g. `https://kalndlord.vercel.app`
-   - `PAYMENT_REDIRECTS`: `https://kalndlord.vercel.app/,kalndlord://`
-5. **Website (Vercel).** The project is already connected. In its settings, set
-   `API_URL` to the API address and `WEB_URL` to the website address, then redeploy.
-6. **Payments (Flutterwave).** The server starts with online payment off. When your
-   Flutterwave account is verified, follow "Taking real payments" above and change
-   `PAYMENT_PROVIDER` to `flutterwave` in Render.
-7. **Android test app.** Install the Expo tools (`npm i -g eas-cli`), sign in with an Expo
-   account, check the API address in `apps/mobile/eas.json`, then run
-   `cd apps/mobile && eas build --profile preview --platform android`. It produces an APK
-   link to share with beta testers. For the Play Store use `--profile production`.
-8. **Try it end to end** with a few real landlords and tenants: sign up, list, apply,
-   accept, record a payment, report a problem, and reset a password.
+5. **Email.** Any SMTP provider (e.g. Brevo, which has a free plan, or a Google Workspace
+   mailbox). You need an `SMTP_URL` like `smtps://user:password@smtp.example.com:465`.
+6. **Server settings.** In `kalndlord-api` → Settings → Environment Variables, add:
+
+   | Name | Value |
+   | --- | --- |
+   | `NODE_ENV` | `production` |
+   | `JWT_SECRET` | a long random string (40+ characters) |
+   | `CRON_SECRET` | another long random string (Vercel's daily timer uses it) |
+   | `PUBLIC_API_URL` | the server's address, e.g. `https://kalndlord-api.vercel.app` |
+   | `CORS_ORIGINS` | the website's address, e.g. `https://kalndlord.vercel.app` |
+   | `PAYMENT_REDIRECTS` | `https://kalndlord.vercel.app/,kalndlord://` |
+   | `PAYMENT_PROVIDER` | `off` (until Flutterwave is ready) |
+   | `STORAGE` | `blob` |
+   | `SMS_PROVIDER` | `africastalking`, plus `AT_USERNAME`, `AT_API_KEY`, `AT_SENDER_ID` |
+   | `EMAIL_PROVIDER` | `smtp`, plus `SMTP_URL` and `EMAIL_FROM` |
+   | `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME` | your administrator account |
+
+   Then redeploy. The administrator account is created on the first deploy that has
+   these set; an existing account keeps its password.
+7. **Website.** In the existing website project's settings, set `API_URL` to the server's
+   address and `WEB_URL` to the website's address, then redeploy.
+8. **Rent bills and reminders** run once a day at 08:00 Kigali time from Vercel's timer
+   (`crons` in `apps/api/vercel.json`); nothing to set up beyond `CRON_SECRET`.
+9. **Payments (Flutterwave).** When your Flutterwave account is verified, follow "Taking
+   real payments" above and change `PAYMENT_PROVIDER` to `flutterwave`.
+10. **Android test app.** Install the Expo tools (`npm i -g eas-cli`), sign in with a free
+    Expo account, set the server's address in `apps/mobile/eas.json`, then run
+    `cd apps/mobile && eas build --profile preview --platform android`. It gives an APK
+    link to share with beta testers. For the Play Store use `--profile production`.
+11. **Try it end to end** with a few real landlords and tenants: sign up, list, apply,
+    accept, record a payment, report a problem, and reset a password.
+
+The API also runs as an ordinary Node server (`node apps/api/dist/server.js`) on any other
+host; there the rent job runs inside the server every `RENT_JOB_MINUTES`, and photos can
+go to any S3-compatible bucket (`STORAGE=s3`, see `.env.example`).
 
 ## Run it locally
 
@@ -125,7 +148,8 @@ A payment only counts once the API has confirmed it with Flutterwave for the ful
 ## Photos
 
 Listing photos (JPG, PNG or WebP, up to 5 MB, 8 per listing) and report photos (4 per
-report) are saved in `apps/api/uploads`
+report) are resized to at most 1600px in the browser and the app before upload, to stay
+under Vercel's 4.5 MB request limit. In development they are saved in `apps/api/uploads`
 and served from `PUBLIC_API_URL/uploads`. Before launch this should move to cloud storage;
 only `apps/api/src/lib/storage.ts` needs to change. Photo addresses use random names that
 can't be guessed, but anyone holding a link can open it.

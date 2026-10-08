@@ -4,6 +4,7 @@ import { useLocalSearchParams } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import type { Listing } from "@kalndlord/shared";
 import { api } from "@/lib/api";
+import { photoFiles } from "@/lib/photos";
 import { Screen } from "@/components/Screen";
 import { ListingEditor } from "@/components/ListingEditor";
 import { Banner, Button, Muted, Section, Title, usePalette } from "@/components/ui";
@@ -33,13 +34,10 @@ export default function EditListing() {
       quality: 0.7,
     });
     if (picked.canceled) return;
-    const body = new FormData();
-    for (const a of picked.assets) {
-      const type = a.mimeType ?? "image/jpeg";
-      // React Native's FormData takes a { uri, name, type } descriptor for files.
-      body.append("photos", { uri: a.uri, name: a.fileName ?? `photo.${type.split("/")[1]}`, type } as unknown as Blob);
-    }
     setUploading(true);
+    const body = new FormData();
+    // React Native's FormData takes a { uri, name, type } descriptor for files.
+    for (const f of await photoFiles(picked.assets)) body.append("photos", f as unknown as Blob);
     const res = await api<{ listing: Listing }>(`/listings/${listing.id}/photos`, body);
     setUploading(false);
     if (!res.ok) return setError(res.data.error);

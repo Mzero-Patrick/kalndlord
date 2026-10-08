@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
+import { shrinkPhotos } from "./shrinkPhotos";
 import type { FormState } from "@/app/actions";
 import { applyForListing, askQuestion, replyToQuestion, uploadPhotos } from "@/app/listing-actions";
 import { FieldError } from "./Field";
@@ -72,15 +73,22 @@ export function ReplyForm({ inquiryId }: { inquiryId: string }) {
 
 export function PhotoUploadForm({ listingId }: { listingId: string }) {
   const [state, action, pending] = useActionState<FormState, FormData>(uploadPhotos, {});
+  const [shrinking, setShrinking] = useState(false);
+  const onPhotos = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.currentTarget;
+    setShrinking(true);
+    await shrinkPhotos(input);
+    setShrinking(false);
+  };
   return (
     <form action={action} className="stack" key={state.message}>
       <Feedback state={state} />
       <input type="hidden" name="id" value={listingId} />
       <label>
         Add photos <span className="hint">JPG, PNG or WebP, up to 5 MB each, 8 per listing</span>
-        <input type="file" name="photos" accept="image/jpeg,image/png,image/webp" multiple required />
+        <input type="file" name="photos" accept="image/jpeg,image/png,image/webp" multiple required onChange={onPhotos} />
       </label>
-      <div><button type="submit" disabled={pending}>{pending ? "Uploading…" : "Upload"}</button></div>
+      <div><button type="submit" disabled={pending || shrinking}>{pending ? "Uploading…" : shrinking ? "Preparing photos…" : "Upload"}</button></div>
     </form>
   );
 }
