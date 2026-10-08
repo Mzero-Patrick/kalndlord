@@ -1,0 +1,8 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "buildCommand": "pnpm build && DATABASE_URL=${DATABASE_URL_UNPOOLED:-$DATABASE_URL} npx prisma migrate deploy && node dist/seed.js --if-configured",
+  "outputDirectory": "public",
+  "rewrites": [{ "source": "/(.*)", "destination": "/api" }],
+  "crons": [{ "path": "/jobs/rent", "schedule": "0 6 * * *" }]
+}

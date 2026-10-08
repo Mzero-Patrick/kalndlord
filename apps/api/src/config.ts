@@ -16,6 +16,9 @@ export interface Config {
   uploadDir: string;
   // Set when photos go to cloud storage instead of uploadDir.
   s3?: S3Settings;
+  blobToken?: string;
+  // Vercel's daily timer calls /jobs/rent with this secret.
+  cronSecret?: string;
   payments: {
     // "off" hides online payment (landlords still record cash) until Flutterwave is set up.
     provider: "sandbox" | "flutterwave" | "off";
@@ -52,8 +55,10 @@ export function loadConfig(): Config {
       secretAccessKey: required("S3_SECRET_ACCESS_KEY"),
       publicUrl: required("S3_PUBLIC_URL"),
     };
-  } else if (process.env.NODE_ENV === "production" && !process.env.UPLOAD_DIR) {
-    console.warn("Set UPLOAD_DIR to a mounted volume (or STORAGE=s3) so photos survive redeploys.");
+  }
+  const blobToken = process.env.STORAGE === "blob" ? required("BLOB_READ_WRITE_TOKEN") : undefined;
+  if (!s3 && !blobToken && process.env.NODE_ENV === "production") {
+    console.warn("Photos are saved on the server's disk. Set STORAGE=s3 so they survive redeploys.");
   }
   return {
     port: Number(process.env.PORT ?? 4000),
@@ -62,6 +67,8 @@ export function loadConfig(): Config {
     publicUrl: (process.env.PUBLIC_API_URL ?? `http://localhost:${process.env.PORT ?? 4000}`).replace(/\/$/, ""),
     uploadDir: process.env.UPLOAD_DIR ?? "uploads",
     s3,
+    blobToken,
+    cronSecret: process.env.CRON_SECRET || undefined,
     payments: {
       provider: provider === "flutterwave" || provider === "off" ? provider : "sandbox",
       flwSecretKey: process.env.FLW_SECRET_KEY,
